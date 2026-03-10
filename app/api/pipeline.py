@@ -6,6 +6,7 @@ from app.retrieval.reranker import rerank
 from app.retrieval.retriever import retrieve
 from app.retrieval.router import decide_strategy
 import json
+import os
 
 
 def ingest_document(file_path:str):
@@ -29,6 +30,9 @@ def ingest_document(file_path:str):
     return profile
 
 def answer_question (question:str, force_strategy:str=None):
+    if not os.path.exists("document_state.json"):
+        raise FileNotFoundError("document_state.json not found. Upload and index a document first.")
+
     with open("document_state.json", "r") as f:
         state= json.load(f)
 
@@ -39,7 +43,27 @@ def answer_question (question:str, force_strategy:str=None):
 
     retrieved_chunks= retrieve(question, strategy_output)
 
+    if not retrieved_chunks:
+        return {
+            "answer": None,
+            "chunks_used": [],
+            "strategy": strategy_output,
+            "confidence": "low",
+            "reason": "No chunks retrieved for the question.",
+            "target_sections": strategy_output["target_sections"]
+        }
+
     reranked_chunks= rerank(question, retrieved_chunks)
+
+    if not reranked_chunks:
+        return {
+            "answer": None,
+            "chunks_used": [],
+            "strategy": strategy_output,
+            "confidence": "low",
+            "reason": "No chunks reranked for the question.",
+            "target_sections": strategy_output["target_sections"]
+        }
 
     return {
         "answer": reranked_chunks[0]["text"],

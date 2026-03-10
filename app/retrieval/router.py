@@ -104,9 +104,9 @@ def decide_strategy(profile: dict, question: str, sections: list[dict], force_st
         return {
             "strategy":        "hierarchical+hybrid",
             "reason":          reason,
-            "target_sections": target_sections,
-            "confidence":      confidence
-        }  
+            "target_sections": [],
+            "confidence":      "medium" if structure_score == "medium" else "low"
+        }
     
     if structure_score == "high" and question_type == "concept":
         target_sections = match_sections(question, sections)
@@ -139,7 +139,7 @@ def decide_strategy(profile: dict, question: str, sections: list[dict], force_st
             "reason":          reason,
             "target_sections": target_sections,
             "confidence":      confidence
-    }
+        }
 
     # --- high structure + term question → hybrid only ---
     if structure_score == "high" and question_type == "term":

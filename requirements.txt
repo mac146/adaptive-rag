@@ -1,0 +1,12 @@
+fastapi==0.118.2
+pydantic==2.12.0
+uvicorn==0.37.0
+litellm
+python-dotenv
+sentence-transformers
+qdrant-client
+bm25s
+pymupdf
+python-docx
+markdown-it-py
+loguru
