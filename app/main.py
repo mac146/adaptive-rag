@@ -57,8 +57,12 @@ async def ask_question(request: QuestionRequest):
 
     user_message = f"Context:\n{context}\n\nQuestion: {request.question}"
 
+    model = os.getenv("LITELLM_MODEL", "gemini/gemini-2.5-flash")
+    api_key = os.getenv("LITELLM_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("OPENAI_API_KEY")
+
     response = litellm.completion(
-        model="gpt-4o-mini",
+        model=model,
+        api_key=api_key,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_message}

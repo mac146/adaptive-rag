@@ -7,6 +7,12 @@ CONCEPT_WORDS = {
     "overview", "tell", "relationship", "effect", "impact"
 }
 
+STOP_WORDS = {
+    "i", "do", "how", "what", "why", "the", "a", "an",
+    "is", "are", "was", "were", "to", "in", "of", "and",
+    "or", "for", "with", "that", "this", "it", "me", "my"
+}
+
 def classify_question(question: str) -> dict:
     words        = question.split()
     lower_words  = set(w.lower() for w in words)
@@ -43,23 +49,37 @@ def classify_question(question: str) -> dict:
     }
 
 
+def share_root(w1: str, w2: str, min_len: int = 5) -> bool:
+    return len(w1) >= min_len and len(w2) >= min_len and w1[:min_len] == w2[:min_len]
+
 def match_sections(question: str, sections: list[dict], top_n: int = 3) -> list[str]:
-    question_words = set(question.lower().split())
+    question_words = {
+        w for w in question.lower().split()
+        if w not in STOP_WORDS and len(w) >= 4
+    }
     scored = []
 
     for section in sections:
         if not section.get("title"):
             continue
         title_words = set(section["title"].lower().split())
-        overlap     = len(question_words & title_words)
-        if overlap > 0:
-            scored.append((section["title"], overlap))
 
-    # sort by overlap score descending
+        exact_overlap = len(question_words & title_words)
+
+        partial_overlap = sum(
+            1 for qw in question_words
+            for tw in title_words
+            if len(qw) >= 4 and len(tw) >= 4
+            and (qw in tw or tw in qw or share_root(qw, tw))
+        )
+
+        score = exact_overlap * 2 + partial_overlap
+        if score > 0:
+            scored.append((section["title"], score))
+
     scored.sort(key=lambda x: x[1], reverse=True)
     top_sections = [title for title, _ in scored[:top_n]]
 
-    # also include children of matched sections
     matched_parents = set(top_sections)
     for section in sections:
         if section.get("parent") in matched_parents:
@@ -102,7 +122,7 @@ def decide_strategy(profile: dict, question: str, sections: list[dict], force_st
         reason = f"Structure score is {structure_score} — section boundaries unreliable, using hybrid"
         logger.info(reason)
         return {
-            "strategy":        "hierarchical+hybrid",
+            "strategy":        "hybrid",
             "reason":          reason,
             "target_sections": [],
             "confidence":      "medium" if structure_score == "medium" else "low"

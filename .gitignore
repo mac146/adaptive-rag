@@ -1,3 +1,9 @@
 __pycache__
 venv
 .env
+bm25s_index.pkl
+document_state.json
+qdrant_data/
+*.pyc
+*.pkl
+temp_*

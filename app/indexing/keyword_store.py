@@ -8,7 +8,7 @@ bm25 = bm25s.BM25()
 def build_index(chunks:list[dict]):
     documents=[chunk["text"] for chunk in chunks]
 
-    retriever=bm25s.BM25S()
+    retriever=bm25s.BM25()
     tokenize= bm25s.tokenize(documents)
     retriever.index(tokenize)
 
@@ -27,7 +27,12 @@ def search(query_text:str,top_k:int=10)->list[dict]:
     retriever, chunks=load_index()
 
     tokenized_query=bm25s.tokenize([query_text])
-    results, scores=retriever.search(tokenized_query,k=top_k)
+    results, scores = retriever.retrieve(
+        tokenized_query,
+        k=top_k,
+        return_as="tuple",
+        show_progress=False
+    )
 
     output=[]
     for idx, score in zip(results[0],scores[0]):

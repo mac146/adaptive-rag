@@ -50,17 +50,19 @@ def search(query_text: str, top_k: int = 10, filter_section: str = None) -> list
             ]
         )
 
-    results = client.search(
+    response = client.query_points(
         collection_name=collection_name,
-        query_vector=query_vector,
+        query=query_vector,
         query_filter=search_filter,
-        limit=top_k
+        limit=top_k,
+        with_payload=True,
+        with_vectors=False
     )
 
     return [
         {
-            **result.payload,
-            "score": result.score
+            **point.payload,
+            "score": point.score
         }
-        for result in results
+        for point in response.points
     ]
