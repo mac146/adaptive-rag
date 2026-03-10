@@ -1,5 +1,5 @@
-from indexing.vector_store import search as  vector_search 
-from indexing.keyword_store import search as  keyword_search
+from app.indexing.vector_store import search as vector_search
+from app.indexing.keyword_store import search as keyword_search
 
 
 def rrf_merge(vector_results , keyword_results, k=60):

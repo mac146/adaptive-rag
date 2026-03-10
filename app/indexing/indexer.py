@@ -1,5 +1,5 @@
-from indexing.vector_store import store_chunks, create_collection
-from indexing.keyword_store import build_index
+from app.indexing.vector_store import store_chunks, create_collection
+from app.indexing.keyword_store import build_index
 
 def index_document(chunks:list[dict]):
     create_collection()

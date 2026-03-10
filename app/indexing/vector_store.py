@@ -1,5 +1,5 @@
 from qdrant_client import QdrantClient
-from indexing.embedder import embed_batch,embed_text
+from app.indexing.embedder import embed_batch, embed_text
 from qdrant_client.models import Distance, VectorParams, PointStruct,Filter,FieldCondition,MatchValue
 import uuid
 
