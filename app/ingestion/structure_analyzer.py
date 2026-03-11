@@ -1,3 +1,24 @@
+import re
+def is_valid_heading(text: str) -> bool:
+    text = text.strip()
+    if len(text) <= 2:                        # "R", "1."
+        return False
+    if text.startswith("Figure"):             # figure captions
+        return False
+    if text.startswith("Table"):              # table captions
+        return False
+    if text.startswith("("):                  # "(a) Early Experience"
+        return False
+    if text.startswith("Project"):            # "Project Page:"
+        return False
+    if "," in text and len(text) > 20:        # author names
+        return False
+    if not any(c.isalpha() for c in text):    # no letters
+        return False
+    if text.endswith(":") and len(text) < 15: # short labels
+        return False
+    return True
+
 def build_sections(elements: list[dict]) -> list[dict]:
     sections = []
     current_section = None
@@ -6,7 +27,7 @@ def build_sections(elements: list[dict]) -> list[dict]:
     heading_stack = []
 
     for elem in elements:
-        if elem["type"] == "heading":
+        if elem["type"] == "heading" and is_valid_heading(elem["text"]):
             if current_section:
                 # word count before closing
                 current_section["word_count"] = len(
@@ -67,6 +88,8 @@ def build_sections(elements: list[dict]) -> list[dict]:
             section["word_count"] = len(section["content"].split())
 
     return sections
+
+
 
 
 def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
