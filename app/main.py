@@ -1,8 +1,10 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 import shutil
 import os
 import litellm
+import tempfile
+from pathlib import Path
 from dotenv import load_dotenv
 from app.api.pipeline import ingest_document, answer_question
 
@@ -27,19 +29,34 @@ def root():
 
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
-    temp_path = f"./temp_{file.filename}"
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing filename.")
 
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {".pdf", ".docx", ".md"}:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
-    profile = ingest_document(temp_path)
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+    temp_path = temp_file.name
+    temp_file.close()
 
-    os.remove(temp_path)
+    try:
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    return {
-        "message": "Document indexed successfully",
-        "profile": profile
-    }
+        profile = ingest_document(temp_path)
+
+        return {
+            "message": "Document indexed successfully",
+            "profile": profile
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 @app.post("/ask")

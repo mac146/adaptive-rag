@@ -11,12 +11,16 @@ import os
 
 def ingest_document(file_path:str):
     elements= parse_document(file_path)
+    if not elements:
+        raise ValueError("No parsable text found in document.")
 
     sections= build_sections(elements)
 
     profile= build_document_profile(sections, elements)
 
     chunks= chunk_sections(sections, profile)
+    if not chunks:
+        raise ValueError("No chunks created from document.")
 
     index_document(chunks)
 

@@ -1,23 +1,48 @@
 import re
+
 def is_valid_heading(text: str) -> bool:
     text = text.strip()
-    if len(text) <= 2:                        # "R", "1."
+
+    if not text:
         return False
-    if text.startswith("Figure"):             # figure captions
+    if len(text) <= 2:
         return False
-    if text.startswith("Table"):              # table captions
+    lower = text.lower()
+    if lower.startswith("figure"):
         return False
-    if text.startswith("("):                  # "(a) Early Experience"
+    if lower.startswith("table"):
         return False
-    if text.startswith("Project"):            # "Project Page:"
+    if text.startswith("("):
         return False
-    if "," in text and len(text) > 20:        # author names
+    if lower.startswith("project"):
         return False
-    if not any(c.isalpha() for c in text):    # no letters
+    if re.match(r"^\d+(\.\d+)*\s*$", text):
         return False
-    if text.endswith(":") and len(text) < 15: # short labels
+    if re.match(r"^[A-Za-z]\.\d+\.?$", text):
+        return False
+    if "," in text and len(text) > 20:
+        return False
+    if not any(c.isalpha() for c in text):
+        return False
+    # heading with period in middle is a sentence not a heading
+    if re.search(r'\.\s+[a-zA-Z]', text):   # "Construct pairs. Pair the..."
+      return False
+
+    # ends with + or other operators
+    if text[-1] in ('+', '=', '-', '*'):
+       return False
+    if text.endswith(":") and len(text) < 15:
+        return False
+    if text.count("(") != text.count(")"):
+        return False
+    if text.endswith((".", ",", ";", "!", "?")):
+        return False
+    if text[0].islower():
+        return False
+    if len(text) >= 80:
         return False
     return True
+
 
 def build_sections(elements: list[dict]) -> list[dict]:
     sections = []
@@ -93,7 +118,7 @@ def build_sections(elements: list[dict]) -> list[dict]:
 
 
 def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
-    headings = [e for e in elements if e["type"] == "heading"]
+    headings = [e for e in elements if e["type"] == "heading" and is_valid_heading(e["text"])]
     total_words = sum(s["word_count"] for s in sections)
     heading_levels = sorted(set(h["level"] for h in headings))
     word_counts = [s["word_count"] for s in sections if s["word_count"] > 0]
@@ -106,11 +131,11 @@ def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
     else:
         size_variance = "low"
 
-    # structure score — how well structured is this doc?
+    # structure score — tuned for research papers with fewer headings per 100 words
     heading_density = len(headings) / max(total_words / 100, 1)
-    if heading_density >= 2 and len(heading_levels) >= 2:
+    if heading_density >= 0.3 and len(heading_levels) >= 2:
         structure_score = "high"
-    elif heading_density >= 1 or len(heading_levels) >= 1:
+    elif heading_density >= 0.15 or len(heading_levels) >= 1:
         structure_score = "medium"
     else:
         structure_score = "low"
@@ -132,3 +157,4 @@ def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
         "structure_score": structure_score,     # "high", "medium", "low"
         "length": length,                       # "short", "medium", "long"
     }
+
