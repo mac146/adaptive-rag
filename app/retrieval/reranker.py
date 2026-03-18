@@ -3,6 +3,8 @@ from sentence_transformers import cross_encoder
 model=cross_encoder.CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 def rerank(question, chunks, top_k=4):
+    if not chunks:
+        return []
     pairs=[(question, chunk["text"]) for chunk in chunks]
         
     scores=model.predict(pairs)

@@ -119,9 +119,10 @@ def build_sections(elements: list[dict]) -> list[dict]:
 
 def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
     headings = [e for e in elements if e["type"] == "heading" and is_valid_heading(e["text"])]
-    total_words = sum(s["word_count"] for s in sections)
+    titled_sections = [s for s in sections if s.get("title")]
+    total_words = sum(s["word_count"] for s in titled_sections)
     heading_levels = sorted(set(h["level"] for h in headings))
-    word_counts = [s["word_count"] for s in sections if s["word_count"] > 0]
+    word_counts = [s["word_count"] for s in titled_sections if s["word_count"] > 0]
 
     # section size variance — are sections evenly sized?
     if len(word_counts) > 1:
@@ -132,7 +133,8 @@ def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
         size_variance = "low"
 
     # structure score — tuned for research papers with fewer headings per 100 words
-    heading_density = len(headings) / max(total_words / 100, 1)
+    valid_heading_count = len(headings)
+    heading_density = valid_heading_count / max(total_words / 100, 1)
     if heading_density >= 0.3 and len(heading_levels) >= 2:
         structure_score = "high"
     elif heading_density >= 0.15 or len(heading_levels) >= 1:
@@ -150,8 +152,8 @@ def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
 
     return {
         "total_words": total_words,
-        "total_sections": len(sections),
-        "heading_count": len(headings),
+        "total_sections": len(titled_sections),
+        "heading_count": valid_heading_count,
         "heading_levels": heading_levels,       # e.g. [1, 2, 3]
         "size_variance": size_variance,         # "high" or "low"
         "structure_score": structure_score,     # "high", "medium", "low"

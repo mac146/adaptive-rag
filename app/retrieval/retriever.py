@@ -33,6 +33,11 @@ def retrieve(question:str, strategy_output, top_k=10):
         return rrf_merge(vec_results, kw_results)
     
     if strategy == "hierarchical+hybrid":
+        if not target_sections:
+            vec_results = vector_search(question, top_k=top_k)
+            kw_results = keyword_search(question, top_k=top_k)
+            return rrf_merge(vec_results, kw_results)
+
         all_vec_results = []
         all_kw_results  = []
 

@@ -64,7 +64,16 @@ async def ask_question(request: QuestionRequest):
     pipeline_output = answer_question(request.question, request.force_strategy)
 
     chunks_used = pipeline_output["chunks_used"]
-    context     = "\n\n".join(chunk["text"] for chunk in chunks_used)
+    max_context_chars = int(os.getenv("MAX_CONTEXT_CHARS", "8000"))
+    context_parts = []
+    total_chars = 0
+    for chunk in chunks_used:
+        text = chunk["text"]
+        if total_chars + len(text) + 2 > max_context_chars:
+            break
+        context_parts.append(text)
+        total_chars += len(text) + 2
+    context = "\n\n".join(context_parts)
 
     system_prompt = (
         "You are a helpful assistant. Answer the question using only "
@@ -77,14 +86,17 @@ async def ask_question(request: QuestionRequest):
     model = os.getenv("LITELLM_MODEL", "gemini/gemini-2.5-flash")
     api_key = os.getenv("LITELLM_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("OPENAI_API_KEY")
 
-    response = litellm.completion(
-        model=model,
-        api_key=api_key,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_message}
-        ]
-    )
+    try:
+        response = litellm.completion(
+            model=model,
+            api_key=api_key,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_message}
+            ]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
     answer = response.choices[0].message.content
 
