@@ -26,10 +26,14 @@ def load_index():
 def search(query_text:str,top_k:int=10)->list[dict]:
     retriever, chunks=load_index()
 
+    k = min(top_k, len(chunks)) if chunks else 0
+    if k == 0:
+        return []
+
     tokenized_query=bm25s.tokenize([query_text])
     results, scores = retriever.retrieve(
         tokenized_query,
-        k=top_k,
+        k=k,
         return_as="tuple",
         show_progress=False
     )

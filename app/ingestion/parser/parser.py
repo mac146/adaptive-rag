@@ -133,7 +133,7 @@ def parse_document(file_path: str) -> list[dict]:
         return parse_pdf(file_path)
     elif file_path.endswith(".docx"):
         return parse_docx(file_path)
-    elif file_path.endswith(".md"):
+    elif file_path.endswith(".md") or file_path.endswith('.txt'):
         return parse_markdown(file_path)
     else:
         raise ValueError(f"Unsupported file format: {file_path}")

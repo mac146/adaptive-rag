@@ -33,7 +33,7 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Missing filename.")
 
     ext = Path(file.filename).suffix.lower()
-    if ext not in {".pdf", ".docx", ".md"}:
+    if ext not in {".pdf", ".docx", ".md", ".txt"}:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
