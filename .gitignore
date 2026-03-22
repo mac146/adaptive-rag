@@ -7,3 +7,4 @@ qdrant_data/
 *.pyc
 *.pkl
 temp_*
+debug.py

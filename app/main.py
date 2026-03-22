@@ -18,6 +18,7 @@ app=FastAPI(
 
 class QuestionRequest(BaseModel):
     question: str
+    document_id: str
     force_strategy: str = None
 
     
@@ -44,11 +45,12 @@ async def upload_document(file: UploadFile = File(...)):
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        profile = ingest_document(temp_path)
+        result = ingest_document(temp_path, file.filename)
 
         return {
             "message": "Document indexed successfully",
-            "profile": profile
+            "document_id": result["document_id"],
+            "profile": result["profile"]
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -61,7 +63,7 @@ async def upload_document(file: UploadFile = File(...)):
 
 @app.post("/ask")
 async def ask_question(request: QuestionRequest):
-    pipeline_output = answer_question(request.question, request.force_strategy)
+    pipeline_output = answer_question(request.question, request.document_id, request.force_strategy)
 
     chunks_used = pipeline_output["chunks_used"]
     max_context_chars = int(os.getenv("MAX_CONTEXT_CHARS", "8000"))
