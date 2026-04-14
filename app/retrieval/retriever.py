@@ -23,33 +23,33 @@ def rrf_merge(vector_results , keyword_results, k=60):
         for cid in sorted_ids[:10]
     ]
 
-def retrieve(question:str, strategy_output, top_k=10):
+def retrieve(question: str, strategy_output: dict, document_id: str, retriever, chunks: list, top_k: int = 10):
     strategy = strategy_output["strategy"]
-    target_sections= strategy_output["target_sections"]
+    target_sections = strategy_output["target_sections"]
 
     if strategy == "hybrid":
-        vec_results = vector_search(question, top_k=top_k)
-        kw_results = keyword_search(question, top_k=top_k)
+        vec_results = vector_search(question, document_id=document_id, top_k=top_k)
+        kw_results = keyword_search(question, retriever=retriever, chunks=chunks, top_k=top_k)
         return rrf_merge(vec_results, kw_results)
-    
+
     if strategy == "hierarchical+hybrid":
         if not target_sections:
-            vec_results = vector_search(question, top_k=top_k)
-            kw_results = keyword_search(question, top_k=top_k)
+            vec_results = vector_search(question, document_id=document_id, top_k=top_k)
+            kw_results = keyword_search(question, retriever=retriever, chunks=chunks, top_k=top_k)
             return rrf_merge(vec_results, kw_results)
 
         all_vec_results = []
         all_kw_results  = []
 
         for section in target_sections:
-            vec_results = vector_search(question, top_k=5, filter_section=section)
-            kw_results  = keyword_search(question, top_k=5)
+            vec_results = vector_search(question, document_id=document_id, top_k=5, filter_section=section)
+            kw_results  = keyword_search(question, retriever=retriever, chunks=chunks, top_k=5)
             all_vec_results.extend(vec_results)
             all_kw_results.extend(kw_results)
 
         return rrf_merge(all_vec_results, all_kw_results)
 
     # fallback
-    vec_results = vector_search(question, top_k=top_k)
-    kw_results  = keyword_search(question, top_k=top_k)
+    vec_results = vector_search(question, document_id=document_id, top_k=top_k)
+    kw_results  = keyword_search(question, retriever=retriever, chunks=chunks, top_k=top_k)
     return rrf_merge(vec_results, kw_results)

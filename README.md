@@ -39,7 +39,6 @@ See `requirements.txt` for dependencies.
 ## Run Locally
 ```bash
 uvicorn app.main:app --reload
-```
 
 ## Notes
 - This build is not hardened for concurrent users.

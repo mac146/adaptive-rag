@@ -69,7 +69,7 @@ def parse_docx(file_path: str) -> list[dict]:
         if not text:
             continue
 
-        style = para.style.name
+        style = para.style.name if para.style else ""
         if style.startswith("Heading"):
             level = int(style.split()[-1])
             elements.append({

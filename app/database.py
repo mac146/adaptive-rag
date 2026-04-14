@@ -7,7 +7,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_connection():
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT", "6543"),
+        dbname=os.getenv("DB_NAME", "postgres"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        sslmode="require"
+    )
 
 
 def save_document(document_id: str, filename: str, profile: dict, sections: list, bm25_retriever, chunks: list):
