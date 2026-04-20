@@ -1,3 +1,12 @@
+---
+title: Adaptive RAG
+emoji: 🤖
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # Adaptive RAG
 
 A structure-aware Retrieval-Augmented Generation (RAG) system that adapts its retrieval strategy based on document structure and question type.
