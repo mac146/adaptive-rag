@@ -1,181 +1,242 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { DocumentUpload } from '@/components/document-upload'
-import { DocumentChat } from '@/components/document-chat'
-import { Toaster } from '@/components/ui/sonner'
-import { toast } from 'sonner'
-import type { DocumentMetadata, Message } from '@/lib/types'
-import { uploadDocument, askQuestion } from '@/lib/api'
+import { useMemo, useState } from 'react'
 
-export default function DocumentQAPage() {
-  const [document, setDocument] = useState<DocumentMetadata | null>(null)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+import { ChatArea } from '@/components/ChatArea'
+import { InputBar } from '@/components/InputBar'
+import { Sidebar } from '@/components/Sidebar'
+import { askQuestion, uploadDocument } from '@/lib/api'
+import type {
+  AdaptiveDocument,
+  AnswerMessage,
+  AskStrategyOverride,
+  DocumentProfile,
+  ThreadMessage,
+  UploadingState,
+  UserMessage,
+} from '@/lib/types'
 
-  const handleUpload = useCallback(async (file: File) => {
-    // Set initial uploading state
-    setDocument({
-      id: 'uploading',
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      uploadedAt: new Date(),
-      status: 'uploading',
-    })
-    setUploadProgress(0)
+const demoProfile: DocumentProfile = {
+  total_words: 6842,
+  total_sections: 12,
+  heading_count: 28,
+  heading_levels: [1, 2, 3],
+  size_variance: 'low',
+  structure_score: 'high',
+  length: 'medium',
+}
 
-    // Progress tracking
-    const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressInterval)
-          return prev
-        }
-        return prev + 10
-      })
-    }, 100)
+const demoDocuments: AdaptiveDocument[] = [
+  {
+    id: 'demo-ops',
+    name: 'enterprise-search-rollout-playbook.pdf',
+    profile: demoProfile,
+    uploadedAt: new Date('2026-04-20T09:30:00+05:30').toISOString(),
+    isDemo: true,
+  },
+  {
+    id: 'demo-policy',
+    name: 'support-knowledge-retention-guidelines.md',
+    profile: {
+      total_words: 3810,
+      total_sections: 8,
+      heading_count: 16,
+      heading_levels: [1, 2],
+      size_variance: 'high',
+      structure_score: 'medium',
+      length: 'medium',
+    },
+    uploadedAt: new Date('2026-04-19T16:15:00+05:30').toISOString(),
+    isDemo: true,
+  },
+  {
+    id: 'demo-brief',
+    name: 'incident-summary.txt',
+    profile: {
+      total_words: 842,
+      total_sections: 2,
+      heading_count: 2,
+      heading_levels: [1],
+      size_variance: 'low',
+      structure_score: 'low',
+      length: 'short',
+    },
+    uploadedAt: new Date('2026-04-18T12:00:00+05:30').toISOString(),
+    isDemo: true,
+  },
+]
+
+const demoMessages: ThreadMessage[] = [
+  {
+    id: 'msg-demo-user',
+    role: 'user',
+    content:
+      'Which rollout milestones should happen before we enable auto routing for customer-facing queries?',
+    createdAt: new Date('2026-04-21T08:32:00+05:30').toISOString(),
+  } satisfies UserMessage,
+  {
+    id: 'msg-demo-answer',
+    role: 'assistant',
+    answer:
+      'The document recommends enabling auto routing only after three checkpoints are complete: section taxonomy review, benchmark validation across at least three query classes, and a fallback policy for low-confidence answers. It also notes that support teams should approve the escalation path before customer traffic is routed automatically.',
+    createdAt: new Date('2026-04-21T08:33:00+05:30').toISOString(),
+    strategy_used: 'hierarchical+hybrid',
+    reason:
+      'The question maps directly to rollout and routing sections, so section-aware retrieval followed by hybrid recall gives better precision.',
+    confidence: 'high',
+    target_sections: ['Rollout Gates', 'Routing Policy', 'Risk Controls'],
+    sources: [
+      {
+        section: 'Rollout Gates',
+        page: 7,
+        text:
+          'Before auto routing is enabled, the team must complete taxonomy review, retrieval benchmarking, and fallback readiness checks.',
+      },
+      {
+        section: 'Routing Policy',
+        page: 11,
+        text:
+          'Customer-facing routing may be automated only when low-confidence answers are redirected to a human review lane.',
+      },
+      {
+        section: 'Risk Controls',
+        page: 14,
+        text:
+          'Support leadership signs off on escalation handling before production traffic is allowed to use automatic route selection.',
+      },
+    ],
+  } satisfies AnswerMessage,
+]
+
+export default function Page() {
+  const [documents, setDocuments] = useState<AdaptiveDocument[]>(demoDocuments)
+  const [activeDocumentId, setActiveDocumentId] = useState<string>(demoDocuments[0].id)
+  const [messages, setMessages] = useState<ThreadMessage[]>(demoMessages)
+  const [inputValue, setInputValue] = useState('')
+  const [forceStrategy, setForceStrategy] = useState<AskStrategyOverride>('auto')
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadingState, setUploadingState] = useState<UploadingState | null>(null)
+  const [isAsking, setIsAsking] = useState(false)
+
+  const activeDocument = useMemo(
+    () => documents.find((document) => document.id === activeDocumentId) ?? null,
+    [activeDocumentId, documents],
+  )
+
+  async function handleUpload(file: File) {
+    setIsUploading(true)
+    setUploadingState({ fileName: file.name })
 
     try {
-      // Call backend API
       const response = await uploadDocument(file)
-      
-      clearInterval(progressInterval)
-      setUploadProgress(100)
-
-      // Transition to indexing
-      setDocument((prev) => prev ? { ...prev, status: 'indexing' } : null)
-
-      // Set ready state with actual metadata from backend
-      setDocument({
+      const uploadedDocument: AdaptiveDocument = {
         id: response.document_id,
         name: file.name,
-        size: file.size,
-        type: file.type,
-        uploadedAt: new Date(),
-        status: 'ready',
-        pageCount: response.profile.total_chunks,
-        sections: response.profile.sections || [],
-        structureType: 'Document',
-      })
+        profile: response.profile,
+        uploadedAt: new Date().toISOString(),
+      }
 
-      // Clear messages for new document
-      setMessages([])
-
-      toast.success('Document indexed successfully', {
-        description: `${file.name} is ready for questions.`,
-      })
-    } catch (error) {
-      clearInterval(progressInterval)
-      setDocument((prev) => prev ? { ...prev, status: 'error' } : null)
-      toast.error('Upload failed', {
-        description: error instanceof Error ? error.message : 'There was an error processing your document.',
-      })
+      setDocuments((current) => [uploadedDocument, ...current])
+      setActiveDocumentId(uploadedDocument.id)
+      setMessages([
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          answer:
+            'Document indexed successfully. Ask about section intent, key findings, metrics, or any page-specific detail and I’ll route the query automatically.',
+          createdAt: new Date().toISOString(),
+          strategy_used: 'hybrid',
+          reason: 'Initialization response after successful upload.',
+          confidence: 'high',
+          target_sections: [],
+          sources: [],
+        },
+      ])
+    } finally {
+      setIsUploading(false)
+      setUploadingState(null)
     }
-  }, [])
+  }
 
-  const handleSendMessage = useCallback(async (content: string) => {
-    if (!document?.id || document.status !== 'ready') {
-      toast.error('No document loaded', {
-        description: 'Please upload a document first.',
-      })
+  async function handleAsk() {
+    const question = inputValue.trim()
+    if (!question || !activeDocument || isAsking) {
       return
     }
 
-    const userMessage: Message = {
+    const userMessage: UserMessage = {
       id: crypto.randomUUID(),
       role: 'user',
-      content,
-      timestamp: new Date(),
+      content: question,
+      createdAt: new Date().toISOString(),
     }
 
-    setMessages((prev) => [...prev, userMessage])
-    setIsLoading(true)
+    setMessages((current) => [...current, userMessage])
+    setInputValue('')
+    setIsAsking(true)
 
     try {
-      // Call backend API
-      const response = await askQuestion(content, document.id)
+      const response = await askQuestion({
+        question,
+        document_id: activeDocument.id,
+        force_strategy: forceStrategy === 'auto' ? undefined : forceStrategy,
+      })
 
-      const assistantMessage: Message = {
+      const answerMessage: AnswerMessage = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: response.answer,
-        timestamp: new Date(),
-        confidence: response.confidence === 'high' ? 95 : response.confidence === 'medium' ? 75 : 55,
-        strategy: response.strategy_used,
-        sources: response.sources.map((source, index) => ({
-          id: String(index),
-          title: source.section || 'Unnamed Section',
-          pageNumber: source.page,
-          content: source.text || '',
-        })),
+        answer: response.answer,
+        createdAt: new Date().toISOString(),
+        strategy_used: response.strategy_used,
+        reason: response.reason,
+        confidence: response.confidence,
+        target_sections: response.target_sections,
+        sources: response.sources,
       }
 
-      setMessages((prev) => [...prev, assistantMessage])
+      setMessages((current) => [...current, answerMessage])
     } catch (error) {
-      toast.error('Failed to get response', {
-        description: error instanceof Error ? error.message : 'There was an error processing your question.',
-      })
+      const message = error instanceof Error ? error.message : 'Request failed.'
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          answer: `I couldn't complete that request. ${message}`,
+          createdAt: new Date().toISOString(),
+          strategy_used: 'hybrid',
+          reason: 'Error fallback shown after the API request failed.',
+          confidence: 'low',
+          target_sections: [],
+          sources: [],
+        },
+      ])
     } finally {
-      setIsLoading(false)
+      setIsAsking(false)
     }
-  }, [document?.id, document?.status])
+  }
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#0f0f0f]">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-[#333]">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center bg-[#3b82f6]">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              className="h-4 w-4 text-white"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <path d="M14 2v6h6" />
-              <path d="M16 13H8" />
-              <path d="M16 17H8" />
-              <path d="M10 9H8" />
-            </svg>
-          </div>
-          <h1 className="text-lg font-semibold text-white">ADAPTIVE-RAG</h1>
-        </div>
-        <span className="text-xs text-[#666]">Document Intelligence Platform</span>
-      </header>
-
-      {/* Main Content */}
-      <div className="flex flex-1 flex-col lg:flex-row min-h-0">
-        {/* Document Panel */}
-        <div className="w-full lg:w-[400px] border-b lg:border-b-0 lg:border-r border-[#333] p-5">
-          <div className="mb-4">
-            <h2 className="text-sm font-medium text-[#f5f5f5] mb-1">Document</h2>
-            <p className="text-xs text-[#a3a3a3]">
-              Upload a document to analyze and query
-            </p>
-          </div>
-          <DocumentUpload
-            document={document}
-            onUpload={handleUpload}
-            uploadProgress={uploadProgress}
-          />
-        </div>
-
-        {/* Chat Panel */}
-        <div className="flex flex-1 flex-col min-h-0">
-          <DocumentChat
-            messages={messages}
-            onSendMessage={handleSendMessage}
-            isDocumentReady={document?.status === 'ready'}
-            isLoading={isLoading}
-          />
-        </div>
-      </div>
-
-      <Toaster position="bottom-right" theme="dark" />
+    <main className="flex h-screen overflow-hidden bg-background text-[13px] text-foreground">
+      <Sidebar
+        documents={documents}
+        activeDocumentId={activeDocumentId}
+        onSelectDocument={setActiveDocumentId}
+        onUpload={handleUpload}
+        isUploading={isUploading}
+        uploadingState={uploadingState}
+      />
+      <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <ChatArea activeDocument={activeDocument} messages={messages} isLoading={isAsking} />
+        <InputBar
+          value={inputValue}
+          onValueChange={setInputValue}
+          onSubmit={handleAsk}
+          strategy={forceStrategy}
+          onStrategyChange={setForceStrategy}
+          disabled={!activeDocument || isAsking || isUploading}
+        />
+      </section>
     </main>
   )
 }
