@@ -26,6 +26,15 @@ The system analyzes document structure (headings, sections, hierarchy) and intel
 5. **Rerank** — Cross-encoder reranking to surface the most relevant chunks.
 6. **Answer** — Send top chunks as context to Gemini 2.5 Flash via LiteLLM. Answer is strictly grounded in the document.
 
+Your Live URLs
+
+Endpoint URL
+
+Health=https://mac146-adaptive-rag.hf.space/healthUpload
+doc=https://mac146-adaptive-rag.hf.space/uploadAsk
+question=https://mac146-adaptive-rag.hf.space/askAPI
+Docs=https://mac146-adaptive-rag.hf.space/docs
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -102,6 +111,17 @@ GOOGLE_API_KEY=
 LITELLM_MODEL=gemini/gemini-2.5-flash
 MAX_CONTEXT_CHARS=8000
 ```
+
+## Live Demo
+
+**Base URL:** https://mac146-adaptive-rag.hf.space
+
+| Endpoint | URL |
+|---|---|
+| Health | https://mac146-adaptive-rag.hf.space/health |
+| Upload | https://mac146-adaptive-rag.hf.space/upload |
+| Ask | https://mac146-adaptive-rag.hf.space/ask |
+| API Docs | https://mac146-adaptive-rag.hf.space/docs |
 
 ## Deployment
 
