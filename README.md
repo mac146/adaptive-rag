@@ -1,3 +1,12 @@
+---
+title: Adaptive RAG
+emoji: 🤖
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # Adaptive RAG
 
 > A structure-aware Retrieval-Augmented Generation system that intelligently adapts its retrieval strategy based on how a document is organized and what kind of question is being asked.
@@ -275,8 +284,13 @@ DB_PASSWORD=your-db-password
 
 GOOGLE_API_KEY=your-google-api-key
 LITELLM_MODEL=gemini/gemini-2.5-flash
+GEMINI_FALLBACK_MODELS=gemini/gemini-2.0-flash-lite,gemini/gemini-1.5-flash
 MAX_CONTEXT_CHARS=8000
 ```
+
+If the primary model returns an overload-style error such as `429`, `503`, `RESOURCE_EXHAUSTED`, or "overloaded", the backend will automatically retry with the models listed in `GEMINI_FALLBACK_MODELS` from left to right.
+
+`GEMINI_FALLBACK_MODELS` is used when `LITELLM_MODEL` starts with `gemini/`. The older `LITELLM_FALLBACK_MODELS` setting still works as a generic fallback for non-Gemini setups or for backward compatibility.
 
 ### Frontend
 

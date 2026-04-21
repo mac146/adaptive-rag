@@ -11,6 +11,62 @@ from app.api.pipeline import ingest_document, answer_question
 
 load_dotenv()
 
+OVERLOAD_ERROR_HINTS = (
+    "overloaded",
+    "overloaded_error",
+    "resource_exhausted",
+    "rate limit",
+    "rate_limit",
+    "too many requests",
+    "429",
+    "503",
+    "service unavailable",
+    "unavailable",
+)
+
+
+def _parse_model_list(raw: str):
+    return [model.strip() for model in raw.split(",") if model.strip()]
+
+
+def _parse_fallback_models(primary_model: str):
+    if primary_model.startswith("gemini/"):
+        gemini_raw = os.getenv("GEMINI_FALLBACK_MODELS", "")
+        if gemini_raw.strip():
+            return _parse_model_list(gemini_raw)
+
+    generic_raw = os.getenv("LITELLM_FALLBACK_MODELS", "")
+    return _parse_model_list(generic_raw)
+
+
+def _is_overload_error(error: Exception) -> bool:
+    status_code = getattr(error, "status_code", None)
+    if status_code in {429, 503}:
+        return True
+
+    message = str(error).lower()
+    return any(hint in message for hint in OVERLOAD_ERROR_HINTS)
+
+
+def _complete_with_fallback(models, api_key, messages):
+    last_error = None
+
+    for index, model in enumerate(models):
+        try:
+            response = litellm.completion(
+                model=model,
+                api_key=api_key,
+                messages=messages,
+            )
+            return response, model
+        except Exception as error:
+            last_error = error
+            has_more_models = index < len(models) - 1
+            if not has_more_models or not _is_overload_error(error):
+                raise
+
+    raise last_error
+
 app=FastAPI(
     title="adaptive-rag",
     description="Structure-aware RAG system",
@@ -95,18 +151,17 @@ async def ask_question(request: QuestionRequest):
 
     user_message = f"Context:\n{context}\n\nQuestion: {request.question}"
 
-    model = os.getenv("LITELLM_MODEL", "gemini/gemini-2.5-flash")
+    primary_model = os.getenv("LITELLM_MODEL", "gemini/gemini-2.5-flash")
+    fallback_models = _parse_fallback_models(primary_model)
+    models_to_try = [primary_model, *fallback_models]
     api_key = os.getenv("LITELLM_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("OPENAI_API_KEY")
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user",   "content": user_message}
+    ]
 
     try:
-        response = litellm.completion(
-            model=model,
-            api_key=api_key,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_message}
-            ]
-        )
+        response, model_used = _complete_with_fallback(models_to_try, api_key, messages)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
@@ -117,6 +172,7 @@ async def ask_question(request: QuestionRequest):
         "strategy_used":   pipeline_output["strategy"]["strategy"],
         "reason":          pipeline_output["reason"],
         "confidence":      pipeline_output["confidence"],
+        "model_used":      model_used,
         "target_sections": pipeline_output["target_sections"],
         "sources": [
             {
@@ -131,8 +187,6 @@ async def ask_question(request: QuestionRequest):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-
 
 
 
