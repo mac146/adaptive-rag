@@ -284,7 +284,7 @@ DB_PASSWORD=your-db-password
 
 GOOGLE_API_KEY=your-google-api-key
 LITELLM_MODEL=gemini/gemini-2.5-flash
-GEMINI_FALLBACK_MODELS=gemini/gemini-2.0-flash-lite,gemini/gemini-1.5-flash
+GEMINI_FALLBACK_MODELS=gemini/gemini-2.5-flash-lite,gemini/gemini-2.0-flash-lite
 MAX_CONTEXT_CHARS=8000
 ```
 
