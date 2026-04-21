@@ -13,13 +13,7 @@ pinned: false
 
 ## Live Demo
 
-| | URL |
-|---|---|
-| **Frontend** | https://eclectic-sable-5fc2e5.netlify.app |
-| **API Docs** | https://mac146-adaptive-rag.hf.space/docs |
-| **Backend** | https://mac146-adaptive-rag.hf.space |
-
----
+🚧 Demo temporarily unavailable — auth + frontend rewrite in progress
 
 ## What Problem Does This Solve?
 
