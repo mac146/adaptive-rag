@@ -15,30 +15,29 @@ A structure-aware Retrieval-Augmented Generation (RAG) system that adapts its re
 
 Upload a document → ask questions → get accurate answers grounded in the document.
 
-The system analyzes document structure (headings, sections, hierarchy) and intelligently selects between hybrid and hierarchical retrieval strategies depending on how the document is organized and what kind of question is being asked.
-
 ## How It Works
 
 1. **Upload** — Parse a PDF, DOCX, Markdown, or TXT file. Extract structure and build a document profile.
-2. **Index** — Chunk the document adaptively. Store chunks in Qdrant (vector search) and BM25 (keyword search) indexed by `document_id`.
-3. **Route** — On a question, classify it (concept vs term/technical) and select a retrieval strategy based on the document profile.
-4. **Retrieve** — Run hybrid search (vector + BM25), merge results with Reciprocal Rank Fusion.
+2. **Index** — Chunk adaptively. Store in Qdrant (vector) and BM25 (keyword) indexed by `document_id`.
+3. **Route** — Classify question (concept vs term) and select retrieval strategy based on document profile.
+4. **Retrieve** — Run hybrid search (vector + BM25), merge with Reciprocal Rank Fusion.
 5. **Rerank** — Cross-encoder reranking to surface the most relevant chunks.
-6. **Answer** — Send top chunks as context to Gemini 2.5 Flash via LiteLLM. Answer is strictly grounded in the document.
+6. **Answer** — Send top chunks to Gemini 2.5 Flash via LiteLLM. Answer strictly grounded in document.
 
-Your Live URLs
+## Live Demo
 
-Endpoint URL
-
-Health=https://mac146-adaptive-rag.hf.space/healthUpload
-doc=https://mac146-adaptive-rag.hf.space/uploadAsk
-question=https://mac146-adaptive-rag.hf.space/askAPI
-Docs=https://mac146-adaptive-rag.hf.space/docs
+| Endpoint | URL |
+|----------|-----|
+| Frontend | https://eclectic-sable-5fc2e5.netlify.app |
+| Health | https://mac146-adaptive-rag.hf.space/health |
+| Upload | https://mac146-adaptive-rag.hf.space/upload |
+| Ask | https://mac146-adaptive-rag.hf.space/ask |
+| API Docs | https://mac146-adaptive-rag.hf.space/docs |
 
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
+|-------|------------|
 | API | FastAPI |
 | Vector DB | Qdrant Cloud |
 | Database | Supabase PostgreSQL |
@@ -72,23 +71,6 @@ Content-Type: application/json
 ```
 Returns answer, strategy used, confidence, and source sections.
 
-## Project Structure
-
-```
-adaptive-rag/
-├── backend/
-│   ├── app/
-│   │   ├── main.py              # FastAPI entry point
-│   │   ├── database.py          # Supabase operations
-│   │   ├── api/pipeline.py      # Orchestration
-│   │   ├── ingestion/           # Parsing, chunking, structure analysis
-│   │   ├── indexing/            # Embeddings, Qdrant, BM25
-│   │   └── retrieval/           # Router, retriever, reranker
-│   ├── requirements.txt
-│   └── Dockerfile
-└── frontend/                    # Coming soon
-```
-
 ## Running Locally
 
 ```bash
@@ -97,7 +79,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Set the following environment variables in a `.env` file inside `backend/`:
+Set environment variables in `backend/.env`:
 
 ```
 QDRANT_URL=
@@ -111,18 +93,3 @@ GOOGLE_API_KEY=
 LITELLM_MODEL=gemini/gemini-2.5-flash
 MAX_CONTEXT_CHARS=8000
 ```
-
-## Live Demo
-
-**Base URL:** https://mac146-adaptive-rag.hf.space
-
-| Endpoint | URL |
-|---|---|
-| Health | https://mac146-adaptive-rag.hf.space/health |
-| Upload | https://mac146-adaptive-rag.hf.space/upload |
-| Ask | https://mac146-adaptive-rag.hf.space/ask |
-| API Docs | https://mac146-adaptive-rag.hf.space/docs |
-
-## Deployment
-
-Backend is deployed on Hugging Face Spaces (Docker). See `backend/Dockerfile`.
