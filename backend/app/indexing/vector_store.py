@@ -6,7 +6,8 @@ import uuid
 
 client = QdrantClient(
     url=os.getenv("QDRANT_URL"),
-    api_key=os.getenv("QDRANT_API_KEY")
+    api_key=os.getenv("QDRANT_API_KEY"),
+    timeout=15,
 )
 
 def get_collection_name(document_id: str) -> str:
