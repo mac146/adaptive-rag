@@ -1,11 +1,9 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { memo, useEffect, useRef } from 'react'
 
 import { AnswerCard } from '@/components/AnswerCard'
 import { MessageBubble } from '@/components/MessageBubble'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { AdaptiveDocument, ThreadMessage } from '@/lib/types'
 
@@ -13,15 +11,6 @@ interface ChatAreaProps {
   activeDocument: AdaptiveDocument | null
   messages: ThreadMessage[]
   isLoading: boolean
-}
-
-const pillVariants = {
-  hidden: { opacity: 0, x: 10 },
-  visible: (index: number) => ({
-    opacity: 1,
-    x: 0,
-    transition: { duration: 0.22, delay: index * 0.08 },
-  }),
 }
 
 function profileTone(value: string) {
@@ -38,6 +27,9 @@ function profileTone(value: string) {
       return 'bg-secondary text-secondary-foreground'
   }
 }
+
+const MemoAnswerCard = memo(AnswerCard)
+const MemoMessageBubble = memo(MessageBubble)
 
 export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -60,7 +52,7 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages, isLoading])
+  }, [messages.length, isLoading])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -70,17 +62,13 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
             {activeDocument?.name ?? 'No document selected'}
           </h1>
           <div className="mt-3 flex flex-wrap gap-2">
-            {profilePills.map((pill, index) => (
-              <motion.span
-                key={`${activeDocument?.id ?? 'empty'}-${pill.label}`}
-                custom={index}
-                initial="hidden"
-                animate="visible"
-                variants={pillVariants}
+            {profilePills.map((pill) => (
+              <span
+                key={pill.label}
                 className={`px-2 py-1 text-[11px] uppercase tracking-[0.08em] ${pill.tone}`}
               >
                 {pill.label}
-              </motion.span>
+              </span>
             ))}
           </div>
         </div>
@@ -88,19 +76,19 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
           Auto routing on
         </div>
       </header>
-      <ScrollArea className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-6">
           {messages.map((message) =>
             message.role === 'user' ? (
-              <MessageBubble key={message.id} message={message} />
+              <MemoMessageBubble key={message.id} message={message} />
             ) : (
-              <AnswerCard key={message.id} message={message} />
+              <MemoAnswerCard key={message.id} message={message} />
             ),
           )}
           {isLoading ? <LoadingAnswerCard /> : null}
           <div ref={bottomRef} aria-hidden="true" />
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }
