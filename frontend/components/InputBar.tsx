@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { Send, Square } from 'lucide-react'
 
 import {
@@ -36,10 +37,19 @@ export function InputBar({
   controlsDisabled,
   submitDisabled,
 }: InputBarProps) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    if (!inputDisabled) {
+      textareaRef.current?.focus()
+    }
+  }, [inputDisabled])
+
   return (
-    <div className="shrink-0 border-t-[0.5px] border-border bg-card px-6 py-4">
-      <div className="mx-auto flex w-full max-w-4xl items-center gap-3 border-[0.5px] border-border bg-background px-3 py-3">
-        <input
+    <div className="relative z-20 shrink-0 border-t-[0.5px] border-border bg-card px-6 py-4">
+      <div className="mx-auto flex w-full max-w-4xl items-end gap-3 border-[0.5px] border-border bg-background px-3 py-3">
+        <textarea
+          ref={textareaRef}
           value={value}
           onChange={(event) => onValueChange(event.target.value)}
           onKeyDown={(event) => {
@@ -50,7 +60,8 @@ export function InputBar({
           }}
           placeholder="Ask anything about this document..."
           disabled={inputDisabled}
-          className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+          rows={1}
+          className="min-h-[24px] max-h-40 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent text-[13px] outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
         />
         <Select
           value={strategy}

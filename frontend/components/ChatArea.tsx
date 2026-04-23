@@ -32,20 +32,27 @@ const MemoAnswerCard = memo(AnswerCard)
 const MemoMessageBubble = memo(MessageBubble)
 
 export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps) {
-  const bottomRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const userScrolledUp = useRef(false)
 
   function handleScroll() {
-    const el = scrollRef.current
-    if (!el) return
-    userScrolledUp.current = el.scrollTop + el.clientHeight < el.scrollHeight - 100
+    const element = scrollRef.current
+    if (!element) return
+    userScrolledUp.current = element.scrollTop + element.clientHeight < element.scrollHeight - 120
   }
 
   useEffect(() => {
-    if (!userScrolledUp.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-    }
+    const element = scrollRef.current
+    if (!element || userScrolledUp.current) return
+
+    const frame = window.requestAnimationFrame(() => {
+      element.scrollTo({
+        top: element.scrollHeight,
+        behavior: 'smooth',
+      })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
   }, [messages.length, isLoading])
 
   const profilePills = activeDocument
@@ -64,10 +71,6 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
         },
       ]
     : []
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages.length, isLoading])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -91,7 +94,11 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
           Auto routing on
         </div>
       </header>
-      <div ref={scrollRef} onScroll={handleScroll} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto outline-none">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-6">
           {messages.map((message) =>
             message.role === 'user' ? (
@@ -101,7 +108,6 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
             ),
           )}
           {isLoading ? <LoadingAnswerCard /> : null}
-          <div ref={bottomRef} aria-hidden="true" />
         </div>
       </div>
     </div>
