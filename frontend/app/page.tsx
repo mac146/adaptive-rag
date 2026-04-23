@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import { ChatArea } from '@/components/ChatArea'
 import { InputBar } from '@/components/InputBar'
@@ -24,11 +24,15 @@ export default function Page() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadingState, setUploadingState] = useState<UploadingState | null>(null)
   const [isAsking, setIsAsking] = useState(false)
+  const activeRequestRef = useRef<AbortController | null>(null)
 
   const activeDocument = useMemo(
     () => documents.find((document) => document.id === activeDocumentId) ?? null,
     [activeDocumentId, documents],
   )
+  const inputDisabled = !activeDocument || isUploading
+  const submitDisabled = inputDisabled || isAsking || !inputValue.trim()
+  const controlsDisabled = !activeDocument || isUploading || isAsking
 
   async function handleUpload(file: File) {
     setIsUploading(true)
@@ -50,7 +54,7 @@ export default function Page() {
           id: crypto.randomUUID(),
           role: 'assistant',
           answer:
-            'Document indexed successfully. Ask about section intent, key findings, metrics, or any page-specific detail and I’ll route the query automatically.',
+            "Document indexed successfully. Ask about section intent, key findings, metrics, or any page-specific detail and I'll route the query automatically.",
           createdAt: new Date().toISOString(),
           strategy_used: 'hybrid',
           reason: 'Initialization response after successful upload.',
@@ -81,13 +85,18 @@ export default function Page() {
     setMessages((current) => [...current, userMessage])
     setInputValue('')
     setIsAsking(true)
+    const abortController = new AbortController()
+    activeRequestRef.current = abortController
 
     try {
-      const response = await askQuestion({
-        question,
-        document_id: activeDocument.id,
-        force_strategy: forceStrategy === 'auto' ? undefined : forceStrategy,
-      })
+      const response = await askQuestion(
+        {
+          question,
+          document_id: activeDocument.id,
+          force_strategy: forceStrategy === 'auto' ? undefined : forceStrategy,
+        },
+        { signal: abortController.signal },
+      )
 
       const answerMessage: AnswerMessage = {
         id: crypto.randomUUID(),
@@ -104,6 +113,24 @@ export default function Page() {
       setMessages((current) => [...current, answerMessage])
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Request failed.'
+      if (message === 'The request was canceled.') {
+        setMessages((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            answer: 'Request canceled.',
+            createdAt: new Date().toISOString(),
+            strategy_used: 'hybrid',
+            reason: 'The in-flight request was canceled by the user.',
+            confidence: 'low',
+            target_sections: [],
+            sources: [],
+          },
+        ])
+        return
+      }
+
       setMessages((current) => [
         ...current,
         {
@@ -119,8 +146,13 @@ export default function Page() {
         },
       ])
     } finally {
+      activeRequestRef.current = null
       setIsAsking(false)
     }
+  }
+
+  function handleCancelAsk() {
+    activeRequestRef.current?.abort()
   }
 
   return (
@@ -141,7 +173,11 @@ export default function Page() {
           onSubmit={handleAsk}
           strategy={forceStrategy}
           onStrategyChange={setForceStrategy}
-          disabled={!activeDocument || isAsking || isUploading}
+          isAsking={isAsking}
+          onCancel={handleCancelAsk}
+          inputDisabled={inputDisabled}
+          controlsDisabled={controlsDisabled}
+          submitDisabled={submitDisabled}
         />
       </section>
     </main>

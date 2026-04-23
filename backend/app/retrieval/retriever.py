@@ -43,7 +43,13 @@ def retrieve(question: str, strategy_output: dict, document_id: str, retriever, 
 
         for section in target_sections:
             vec_results = vector_search(question, document_id=document_id, top_k=5, filter_section=section)
-            kw_results  = keyword_search(question, retriever=retriever, chunks=chunks, top_k=5)
+            kw_results  = keyword_search(
+                question,
+                retriever=retriever,
+                chunks=chunks,
+                top_k=5,
+                filter_section=section,
+            )
             all_vec_results.extend(vec_results)
             all_kw_results.extend(kw_results)
 

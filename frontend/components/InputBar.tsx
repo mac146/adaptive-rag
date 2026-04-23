@@ -1,6 +1,6 @@
 'use client'
 
-import { Send } from 'lucide-react'
+import { Send, Square } from 'lucide-react'
 
 import {
   Select,
@@ -17,7 +17,11 @@ interface InputBarProps {
   onSubmit: () => void
   strategy: AskStrategyOverride
   onStrategyChange: (value: AskStrategyOverride) => void
-  disabled: boolean
+  isAsking: boolean
+  onCancel: () => void
+  inputDisabled: boolean
+  controlsDisabled: boolean
+  submitDisabled: boolean
 }
 
 export function InputBar({
@@ -26,7 +30,11 @@ export function InputBar({
   onSubmit,
   strategy,
   onStrategyChange,
-  disabled,
+  isAsking,
+  onCancel,
+  inputDisabled,
+  controlsDisabled,
+  submitDisabled,
 }: InputBarProps) {
   return (
     <div className="shrink-0 border-t-[0.5px] border-border bg-card px-6 py-4">
@@ -41,13 +49,13 @@ export function InputBar({
             }
           }}
           placeholder="Ask anything about this document..."
-          disabled={disabled}
+          disabled={inputDisabled}
           className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
         />
         <Select
           value={strategy}
           onValueChange={(value) => onStrategyChange(value as AskStrategyOverride)}
-          disabled={disabled}
+          disabled={controlsDisabled}
         >
           <SelectTrigger className="h-8 border-[0.5px] border-border bg-background px-2 text-[11px] uppercase tracking-[0.08em] shadow-none">
             <SelectValue />
@@ -58,14 +66,24 @@ export function InputBar({
             <SelectItem value="hierarchical+hybrid">hierarchical+hybrid</SelectItem>
           </SelectContent>
         </Select>
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={disabled || !value.trim()}
-          className="flex size-8 items-center justify-center bg-[#534AB7] text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Send className="size-4" />
-        </button>
+        {isAsking ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex size-8 items-center justify-center border-[0.5px] border-border bg-background text-foreground transition-opacity"
+          >
+            <Square className="size-3.5 fill-current" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={submitDisabled}
+            className="flex size-8 items-center justify-center bg-[#534AB7] text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Send className="size-4" />
+          </button>
+        )}
       </div>
     </div>
   )

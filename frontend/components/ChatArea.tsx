@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 
 import { AnswerCard } from '@/components/AnswerCard'
@@ -39,6 +40,7 @@ function profileTone(value: string) {
 }
 
 export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps) {
+  const bottomRef = useRef<HTMLDivElement | null>(null)
   const profilePills = activeDocument
     ? [
         {
@@ -55,6 +57,10 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
         },
       ]
     : []
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages, isLoading])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -92,6 +98,7 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
             ),
           )}
           {isLoading ? <LoadingAnswerCard /> : null}
+          <div ref={bottomRef} aria-hidden="true" />
         </div>
       </ScrollArea>
     </div>

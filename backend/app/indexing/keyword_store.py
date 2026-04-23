@@ -8,7 +8,13 @@ def build_index(chunks: list[dict]):
     return retriever 
 
 
-def search(query_text: str, retriever, chunks: list[dict], top_k: int = 10) -> list[dict]:
+def search(
+    query_text: str,
+    retriever,
+    chunks: list[dict],
+    top_k: int = 10,
+    filter_section: str | None = None,
+) -> list[dict]:
     k = min(top_k, len(chunks)) if chunks else 0
     if k == 0:
         return []
@@ -24,8 +30,12 @@ def search(query_text: str, retriever, chunks: list[dict], top_k: int = 10) -> l
     output = []
     for idx, score in zip(results[0], scores[0]):
         chunk = chunks[idx]
+        if filter_section is not None and chunk.get("section_title") != filter_section:
+            continue
         output.append({
             **chunk,
             "score": float(score)
         })
+        if len(output) >= top_k:
+            break
     return output

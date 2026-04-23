@@ -2,6 +2,7 @@ import type { AskRequest, AskResponse, HealthResponse, UploadResponse } from '@/
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'https://mac146-adaptive-rag.hf.space'
+const ASK_TIMEOUT_MS = 90000
 
 async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -32,16 +33,50 @@ export async function uploadDocument(file: File): Promise<UploadResponse> {
   return parseJson<UploadResponse>(response)
 }
 
-export async function askQuestion(payload: AskRequest): Promise<AskResponse> {
-  const response = await fetch(`${API_BASE_URL}/ask`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
+export async function askQuestion(
+  payload: AskRequest,
+  options?: { signal?: AbortSignal },
+): Promise<AskResponse> {
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), ASK_TIMEOUT_MS)
+  const externalSignal = options?.signal
+  const abortFromExternal = () => controller.abort()
 
-  return parseJson<AskResponse>(response)
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort()
+    } else {
+      externalSignal.addEventListener('abort', abortFromExternal, { once: true })
+    }
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/ask`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    }).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        if (externalSignal?.aborted) {
+          throw new Error('The request was canceled.')
+        }
+
+        throw new Error('The request timed out. The backend likely got stuck processing the question.')
+      }
+
+      throw error
+    })
+
+    return parseJson<AskResponse>(response)
+  } finally {
+    if (externalSignal) {
+      externalSignal.removeEventListener('abort', abortFromExternal)
+    }
+    window.clearTimeout(timeoutId)
+  }
 }
 
 export async function healthCheck(): Promise<HealthResponse> {
