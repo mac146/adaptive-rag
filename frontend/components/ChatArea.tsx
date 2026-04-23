@@ -33,6 +33,21 @@ const MemoMessageBubble = memo(MessageBubble)
 
 export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const userScrolledUp = useRef(false)
+
+  function handleScroll() {
+    const el = scrollRef.current
+    if (!el) return
+    userScrolledUp.current = el.scrollTop + el.clientHeight < el.scrollHeight - 100
+  }
+
+  useEffect(() => {
+    if (!userScrolledUp.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
+  }, [messages.length, isLoading])
+
   const profilePills = activeDocument
     ? [
         {
@@ -76,7 +91,7 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
           Auto routing on
         </div>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} onScroll={handleScroll} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto outline-none">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-6">
           {messages.map((message) =>
             message.role === 'user' ? (
