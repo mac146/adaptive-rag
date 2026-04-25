@@ -1,10 +1,11 @@
 'use client'
 
-import { memo } from 'react'
-import { FileText } from 'lucide-react'
+import { memo, useCallback } from 'react'
+import { FileText, LogOut } from 'lucide-react'
 
 import { DocList } from '@/components/DocList'
 import { UploadZone } from '@/components/UploadZone'
+import { createClient } from '@/lib/supabase/client'
 import type { AdaptiveDocument, UploadingState } from '@/lib/types'
 
 interface SidebarProps {
@@ -24,6 +25,12 @@ function SidebarComponent({
   isUploading,
   uploadingState,
 }: SidebarProps) {
+  const handleLogout = useCallback(async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }, [])
+
   return (
     <aside className="flex h-full w-full shrink-0 flex-col border-b-[0.5px] border-r-[0.5px] border-border bg-muted md:w-[260px] md:border-b-0">
       <div className="flex items-center gap-3 border-b-[0.5px] border-border px-5 py-4">
@@ -46,6 +53,15 @@ function SidebarComponent({
           activeDocumentId={activeDocumentId}
           onSelectDocument={onSelectDocument}
         />
+      </div>
+      <div className="border-t-[0.5px] border-border px-4 py-3">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <LogOut className="size-3.5" />
+          Sign out
+        </button>
       </div>
     </aside>
   )

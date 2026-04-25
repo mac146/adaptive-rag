@@ -1,4 +1,13 @@
+import { createClient } from '@/lib/supabase/client'
 import type { AskRequest, AskResponse, HealthResponse, UploadResponse } from '@/lib/types'
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token
+    ? { Authorization: `Bearer ${session.access_token}` }
+    : {}
+}
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'https://mac146-adaptive-rag.hf.space'
@@ -24,9 +33,11 @@ async function parseJson<T>(response: Response): Promise<T> {
 export async function uploadDocument(file: File): Promise<UploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
+  const authHeaders = await getAuthHeaders()
 
   const response = await fetch(`${API_BASE_URL}/upload`, {
     method: 'POST',
+    headers: authHeaders,
     body: formData,
   })
 
@@ -50,11 +61,14 @@ export async function askQuestion(
     }
   }
 
+  const authHeaders = await getAuthHeaders()
+
   try {
     const response = await fetch(`${API_BASE_URL}/ask`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
