@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useEffectEvent, useMemo, useRef } from 'react'
 
 import { AnswerCard } from '@/components/AnswerCard'
 import { MessageBubble } from '@/components/MessageBubble'
@@ -31,46 +31,78 @@ function profileTone(value: string) {
 const MemoAnswerCard = memo(AnswerCard)
 const MemoMessageBubble = memo(MessageBubble)
 
-export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps) {
+function ChatAreaComponent({ activeDocument, messages, isLoading }: ChatAreaProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const userScrolledUp = useRef(false)
+  const shouldStickToBottomRef = useRef(true)
+  const previousMessageCountRef = useRef(messages.length)
 
-  function handleScroll() {
+  const updateScrollAnchor = useEffectEvent(() => {
     const element = scrollRef.current
     if (!element) return
-    userScrolledUp.current = element.scrollTop + element.clientHeight < element.scrollHeight - 120
-  }
+    const distanceFromBottom = element.scrollHeight - element.clientHeight - element.scrollTop
+
+    // Keep track of whether the user is still near the bottom so we only auto-scroll
+    // when new content arrives and they have not intentionally scrolled away.
+    shouldStickToBottomRef.current = distanceFromBottom <= 120
+  })
 
   useEffect(() => {
     const element = scrollRef.current
-    if (!element || userScrolledUp.current) return
+    if (!element) return
+
+    updateScrollAnchor()
+
+    // Using a passive native listener keeps scroll tracking off the React event path
+    // and avoids extra work while the user is dragging through the history.
+    element.addEventListener('scroll', updateScrollAnchor, { passive: true })
+
+    return () => {
+      element.removeEventListener('scroll', updateScrollAnchor)
+    }
+  }, [updateScrollAnchor])
+
+  useEffect(() => {
+    const element = scrollRef.current
+    if (!element) return
+
+    const messageCountChanged = previousMessageCountRef.current !== messages.length
+    previousMessageCountRef.current = messages.length
+
+    if (!shouldStickToBottomRef.current || (!messageCountChanged && !isLoading)) {
+      return
+    }
 
     const frame = window.requestAnimationFrame(() => {
-      element.scrollTo({
-        top: element.scrollHeight,
-        behavior: 'smooth',
-      })
+      // We intentionally avoid smooth scrolling here. The previous implementation
+      // animated every append, which fought with manual scrolling and produced the
+      // "jumping up and down" behavior when history grew.
+      element.scrollTop = element.scrollHeight
+      shouldStickToBottomRef.current = true
     })
 
     return () => window.cancelAnimationFrame(frame)
   }, [messages.length, isLoading])
 
-  const profilePills = activeDocument
-    ? [
-        {
-          label: `${activeDocument.profile.structure_score} structure`,
-          tone: profileTone(activeDocument.profile.structure_score),
-        },
-        {
-          label: `${activeDocument.profile.total_sections} sections`,
-          tone: 'bg-secondary text-secondary-foreground',
-        },
-        {
-          label: `${activeDocument.profile.total_words.toLocaleString()} words`,
-          tone: profileTone(activeDocument.profile.length),
-        },
-      ]
-    : []
+  const profilePills = useMemo(
+    () =>
+      activeDocument
+        ? [
+            {
+              label: `${activeDocument.profile.structure_score} structure`,
+              tone: profileTone(activeDocument.profile.structure_score),
+            },
+            {
+              label: `${activeDocument.profile.total_sections} sections`,
+              tone: 'bg-secondary text-secondary-foreground',
+            },
+            {
+              label: `${activeDocument.profile.total_words.toLocaleString()} words`,
+              tone: profileTone(activeDocument.profile.length),
+            },
+          ]
+        : [],
+    [activeDocument],
+  )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -94,17 +126,17 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
           Auto routing on
         </div>
       </header>
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-      >
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-6">
           {messages.map((message) =>
             message.role === 'user' ? (
-              <MemoMessageBubble key={message.id} message={message} />
+              <div key={message.id} className="message-row">
+                <MemoMessageBubble message={message} />
+              </div>
             ) : (
-              <MemoAnswerCard key={message.id} message={message} />
+              <div key={message.id} className="message-row">
+                <MemoAnswerCard message={message} />
+              </div>
             ),
           )}
           {isLoading ? <LoadingAnswerCard /> : null}
@@ -113,6 +145,8 @@ export function ChatArea({ activeDocument, messages, isLoading }: ChatAreaProps)
     </div>
   )
 }
+
+export const ChatArea = memo(ChatAreaComponent)
 
 function LoadingAnswerCard() {
   return (

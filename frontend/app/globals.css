@@ -65,4 +65,10 @@
   body {
     @apply bg-background text-[13px] text-foreground;
   }
+
+  .message-row {
+    /* Reduce layout/paint work for offscreen chat history without changing UI. */
+    content-visibility: auto;
+    contain-intrinsic-size: 220px;
+  }
 }

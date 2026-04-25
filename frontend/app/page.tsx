@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { ChatArea } from '@/components/ChatArea'
 import { InputBar } from '@/components/InputBar'
@@ -34,7 +34,7 @@ export default function Page() {
   const submitDisabled = inputDisabled || isAsking || !inputValue.trim()
   const controlsDisabled = !activeDocument || isUploading || isAsking
 
-  async function handleUpload(file: File) {
+  const handleUpload = useCallback(async (file: File) => {
     setIsUploading(true)
     setUploadingState({ fileName: file.name })
 
@@ -67,9 +67,9 @@ export default function Page() {
       setIsUploading(false)
       setUploadingState(null)
     }
-  }
+  }, [])
 
-  async function handleAsk() {
+  const handleAsk = useCallback(async () => {
     const question = inputValue.trim()
     if (!question || !activeDocument || isAsking) {
       return
@@ -149,14 +149,14 @@ export default function Page() {
       activeRequestRef.current = null
       setIsAsking(false)
     }
-  }
+  }, [activeDocument, forceStrategy, inputValue, isAsking])
 
-  function handleCancelAsk() {
+  const handleCancelAsk = useCallback(() => {
     activeRequestRef.current?.abort()
-  }
+  }, [])
 
   return (
-    <main className="flex h-screen overflow-hidden bg-background text-[13px] text-foreground">
+    <main className="flex h-screen min-h-0 overflow-hidden bg-background text-[13px] text-foreground">
       <Sidebar
         documents={documents}
         activeDocumentId={activeDocumentId}
@@ -165,7 +165,7 @@ export default function Page() {
         isUploading={isUploading}
         uploadingState={uploadingState}
       />
-      <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <ChatArea activeDocument={activeDocument} messages={messages} isLoading={isAsking} />
         <InputBar
           value={inputValue}

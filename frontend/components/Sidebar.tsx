@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { FileText } from 'lucide-react'
 
 import { DocList } from '@/components/DocList'
@@ -15,7 +16,7 @@ interface SidebarProps {
   uploadingState: UploadingState | null
 }
 
-export function Sidebar({
+function SidebarComponent({
   documents,
   activeDocumentId,
   onSelectDocument,
@@ -49,3 +50,5 @@ export function Sidebar({
     </aside>
   )
 }
+
+export const Sidebar = memo(SidebarComponent)
