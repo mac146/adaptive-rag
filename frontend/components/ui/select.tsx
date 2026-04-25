@@ -8,8 +8,16 @@ import { cn } from '@/lib/utils'
 
 function Select({
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+}: React.ComponentProps<typeof SelectPrimitive.Root> & { modal?: boolean }) {
+  return (
+    <SelectPrimitive.Root
+      data-slot="select"
+      // Keep selects non-modal in the chat shell. Radix modal selects disable
+      // outside pointer interaction while open, and if UI state changes mid-close
+      // the textarea can end up looking completely dead to clicks.
+      {...({ modal: false, ...props } as React.ComponentProps<typeof SelectPrimitive.Root>)}
+    />
+  )
 }
 
 function SelectGroup({

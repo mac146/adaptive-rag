@@ -71,6 +71,16 @@ function InputBarComponent({
     }
   }, [controlsDisabled, focusTextarea, isAsking])
 
+  useEffect(() => {
+    if (isStrategyOpen) return
+
+    // Safeguard: if a menu/portal ever leaves global pointer interaction disabled,
+    // immediately clear it so the textarea stays clickable and pasteable.
+    if (document.body.style.pointerEvents === 'none') {
+      document.body.style.pointerEvents = ''
+    }
+  }, [isStrategyOpen, isAsking])
+
   const handleSubmit = useCallback(() => {
     if (submitDisabled) return
 
