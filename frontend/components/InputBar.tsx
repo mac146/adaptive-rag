@@ -39,12 +39,24 @@ function InputBarComponent({
 }: InputBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const previousIsAskingRef = useRef(isAsking)
+  const focusFrameRef = useRef<number | null>(null)
   const [isStrategyOpen, setIsStrategyOpen] = useState(false)
+
+  const releasePointerLock = useCallback(() => {
+    if (document.body.style.pointerEvents === 'none') {
+      document.body.style.pointerEvents = ''
+    }
+  }, [])
 
   const focusTextarea = useCallback(() => {
     if (inputDisabled) return
 
-    window.requestAnimationFrame(() => {
+    if (focusFrameRef.current !== null) {
+      window.cancelAnimationFrame(focusFrameRef.current)
+    }
+
+    focusFrameRef.current = window.requestAnimationFrame(() => {
+      focusFrameRef.current = null
       const textarea = textareaRef.current
       if (!textarea || inputDisabled) return
 
@@ -56,6 +68,16 @@ function InputBarComponent({
       textarea.setSelectionRange(caretPosition, caretPosition)
     })
   }, [inputDisabled])
+
+  useEffect(() => {
+    return () => {
+      if (focusFrameRef.current !== null) {
+        window.cancelAnimationFrame(focusFrameRef.current)
+      }
+
+      releasePointerLock()
+    }
+  }, [releasePointerLock])
 
   useEffect(() => {
     // Root cause: after a submit, focus could remain on the send/stop button or on
@@ -77,10 +99,8 @@ function InputBarComponent({
 
     // Safeguard: if a menu/portal ever leaves global pointer interaction disabled,
     // immediately clear it so the textarea stays clickable and pasteable.
-    if (document.body.style.pointerEvents === 'none') {
-      document.body.style.pointerEvents = ''
-    }
-  }, [isStrategyOpen, isAsking])
+    releasePointerLock()
+  }, [isStrategyOpen, isAsking, releasePointerLock])
 
   useEffect(() => {
     const justFinishedResponse = previousIsAskingRef.current && !isAsking
@@ -94,12 +114,9 @@ function InputBarComponent({
     // send message -> loading -> response completes.
     // When loading ends, clear any stuck body pointer lock and restore textarea focus
     // so click, cursor, typing, and paste all work immediately again.
-    if (document.body.style.pointerEvents === 'none') {
-      document.body.style.pointerEvents = ''
-    }
-
+    releasePointerLock()
     focusTextarea()
-  }, [focusTextarea, inputDisabled, isAsking])
+  }, [focusTextarea, inputDisabled, isAsking, releasePointerLock])
 
   const handleSubmit = useCallback(() => {
     if (submitDisabled) return
@@ -130,7 +147,7 @@ function InputBarComponent({
           placeholder="Ask anything about this document..."
           disabled={inputDisabled}
           rows={1}
-          className="min-h-[24px] max-h-40 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent text-[13px] outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+          className="relative z-[9999] min-h-[24px] max-h-40 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent text-[13px] outline-none pointer-events-auto placeholder:text-muted-foreground disabled:cursor-not-allowed"
         />
         <Select
           open={isStrategyOpen}
