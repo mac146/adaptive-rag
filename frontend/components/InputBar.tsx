@@ -38,6 +38,7 @@ function InputBarComponent({
   submitDisabled,
 }: InputBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const previousIsAskingRef = useRef(isAsking)
   const [isStrategyOpen, setIsStrategyOpen] = useState(false)
 
   const focusTextarea = useCallback(() => {
@@ -80,6 +81,25 @@ function InputBarComponent({
       document.body.style.pointerEvents = ''
     }
   }, [isStrategyOpen, isAsking])
+
+  useEffect(() => {
+    const justFinishedResponse = previousIsAskingRef.current && !isAsking
+    previousIsAskingRef.current = isAsking
+
+    if (!justFinishedResponse || inputDisabled) {
+      return
+    }
+
+    // Guarantee the exact failing flow stays healthy:
+    // send message -> loading -> response completes.
+    // When loading ends, clear any stuck body pointer lock and restore textarea focus
+    // so click, cursor, typing, and paste all work immediately again.
+    if (document.body.style.pointerEvents === 'none') {
+      document.body.style.pointerEvents = ''
+    }
+
+    focusTextarea()
+  }, [focusTextarea, inputDisabled, isAsking])
 
   const handleSubmit = useCallback(() => {
     if (submitDisabled) return
