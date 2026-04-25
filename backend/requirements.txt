@@ -13,3 +13,4 @@ markdown-it-py
 loguru
 psycopg2-binary
 python-multipart
+PyJWT

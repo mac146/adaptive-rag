@@ -8,8 +8,31 @@ import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
 from app.api.pipeline import ingest_document, answer_question
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt  
 
 load_dotenv()
+
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+security = HTTPBearer()
+
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not SUPABASE_JWT_SECRET:
+        raise HTTPException(status_code=500, detail="JWT secret not configured.")
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False},
+        )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token.")
 
 OVERLOAD_ERROR_HINTS = (
     "overloaded",
@@ -99,7 +122,7 @@ def root():
 
 
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), _: dict = Depends(verify_token)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename.")
 
@@ -132,7 +155,7 @@ async def upload_document(file: UploadFile = File(...)):
 
 
 @app.post("/ask")
-async def ask_question(request: QuestionRequest):
+async def ask_question(request: QuestionRequest, _: dict = Depends(verify_token)):
     pipeline_output = answer_question(request.question, request.document_id, request.force_strategy)
 
     chunks_used = pipeline_output["chunks_used"]
