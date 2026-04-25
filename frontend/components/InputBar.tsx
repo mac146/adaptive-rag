@@ -70,14 +70,21 @@ function InputBarComponent({
   }, [inputDisabled])
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        releasePointerLock()
+        focusTextarea()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       if (focusFrameRef.current !== null) {
         window.cancelAnimationFrame(focusFrameRef.current)
       }
-
       releasePointerLock()
     }
-  }, [releasePointerLock])
+  }, [releasePointerLock, focusTextarea])
 
   useEffect(() => {
     // Root cause: after a submit, focus could remain on the send/stop button or on

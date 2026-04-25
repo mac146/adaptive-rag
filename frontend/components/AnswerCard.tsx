@@ -29,7 +29,7 @@ export function AnswerCard({ message }: AnswerCardProps) {
           <p className="leading-6 text-secondary-foreground">{message.answer}</p>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <StrategyPipeline strategy={message.strategy_used} animateKey={message.id} />
+          <StrategyPipeline strategy={message.strategy_used} />
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
             <span className={`size-2 rounded-full ${confidenceTone[message.confidence]}`} />
             <span>{message.confidence} confidence</span>
