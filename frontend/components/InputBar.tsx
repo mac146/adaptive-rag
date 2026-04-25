@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Send, Square } from 'lucide-react'
 
 import {
@@ -25,7 +25,7 @@ interface InputBarProps {
   submitDisabled: boolean
 }
 
-export function InputBar({
+function InputBarComponent({
   value,
   onValueChange,
   onSubmit,
@@ -38,15 +38,54 @@ export function InputBar({
   submitDisabled,
 }: InputBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const [isStrategyOpen, setIsStrategyOpen] = useState(false)
 
-  useEffect(() => {
-    if (!inputDisabled) {
-      textareaRef.current?.focus()
-    }
+  const focusTextarea = useCallback(() => {
+    if (inputDisabled) return
+
+    window.requestAnimationFrame(() => {
+      const textarea = textareaRef.current
+      if (!textarea || inputDisabled) return
+
+      textarea.focus()
+
+      // Keep the caret active after submit/cancel so the input never feels "dead"
+      // even when the surrounding UI rerenders.
+      const caretPosition = textarea.value.length
+      textarea.setSelectionRange(caretPosition, caretPosition)
+    })
   }, [inputDisabled])
 
+  useEffect(() => {
+    // Root cause: after a submit, focus could remain on the send/stop button or on
+    // the strategy Select trigger. If the Select was open during a state change,
+    // its portal/focus handling could leave the input feeling unclickable.
+    // We close the dropdown and explicitly restore focus to the textarea.
+    if (controlsDisabled) {
+      setIsStrategyOpen(false)
+      return
+    }
+
+    if (!isAsking) {
+      focusTextarea()
+    }
+  }, [controlsDisabled, focusTextarea, isAsking])
+
+  const handleSubmit = useCallback(() => {
+    if (submitDisabled) return
+
+    setIsStrategyOpen(false)
+    onSubmit()
+    focusTextarea()
+  }, [focusTextarea, onSubmit, submitDisabled])
+
+  const handleCancel = useCallback(() => {
+    onCancel()
+    focusTextarea()
+  }, [focusTextarea, onCancel])
+
   return (
-    <div className="relative z-20 shrink-0 border-t-[0.5px] border-border bg-card px-6 py-4">
+    <div className="relative z-30 shrink-0 border-t-[0.5px] border-border bg-card px-6 py-4 pointer-events-auto">
       <div className="mx-auto flex w-full max-w-4xl items-end gap-3 border-[0.5px] border-border bg-background px-3 py-3">
         <textarea
           ref={textareaRef}
@@ -55,7 +94,7 @@ export function InputBar({
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault()
-              onSubmit()
+              handleSubmit()
             }
           }}
           placeholder="Ask anything about this document..."
@@ -64,6 +103,8 @@ export function InputBar({
           className="min-h-[24px] max-h-40 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent text-[13px] outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
         />
         <Select
+          open={isStrategyOpen}
+          onOpenChange={setIsStrategyOpen}
           value={strategy}
           onValueChange={(value) => onStrategyChange(value as AskStrategyOverride)}
           disabled={controlsDisabled}
@@ -71,7 +112,13 @@ export function InputBar({
           <SelectTrigger className="h-8 border-[0.5px] border-border bg-background px-2 text-[11px] uppercase tracking-[0.08em] shadow-none">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="border-[0.5px] border-border shadow-none">
+          <SelectContent
+            className="border-[0.5px] border-border shadow-none"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault()
+              focusTextarea()
+            }}
+          >
             <SelectItem value="auto">auto</SelectItem>
             <SelectItem value="hybrid">hybrid</SelectItem>
             <SelectItem value="hierarchical+hybrid">hierarchical+hybrid</SelectItem>
@@ -80,7 +127,7 @@ export function InputBar({
         {isAsking ? (
           <button
             type="button"
-            onClick={onCancel}
+            onClick={handleCancel}
             className="flex size-8 items-center justify-center border-[0.5px] border-border bg-background text-foreground transition-opacity"
           >
             <Square className="size-3.5 fill-current" />
@@ -88,7 +135,7 @@ export function InputBar({
         ) : (
           <button
             type="button"
-            onClick={onSubmit}
+            onClick={handleSubmit}
             disabled={submitDisabled}
             className="flex size-8 items-center justify-center bg-[#534AB7] text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -99,3 +146,5 @@ export function InputBar({
     </div>
   )
 }
+
+export const InputBar = memo(InputBarComponent)
