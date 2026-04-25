@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useEffect, useEffectEvent, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { AnswerCard } from '@/components/AnswerCard'
 import { MessageBubble } from '@/components/MessageBubble'
@@ -22,32 +22,25 @@ function ChatMessagesComponent({ messages, isLoading }: ChatMessagesProps) {
   const previousMessageCountRef = useRef(messages.length)
 
   const renderedMessages = useMemo(() => {
-    // Root cause: the full chat history kept growing in the DOM, so every new
-    // message made layout, paint, and scroll work more expensive. Keeping the
-    // latest window rendered preserves the current UI while preventing the
-    // message list from becoming a huge long-lived tree.
     return messages.slice(-MAX_RENDERED_MESSAGES)
   }, [messages])
 
-  const updateScrollAnchor = useEffectEvent(() => {
+  const handleScroll = useCallback(() => {
     const element = scrollRef.current
     if (!element) return
-
     const distanceFromBottom = element.scrollHeight - element.clientHeight - element.scrollTop
     shouldStickToBottomRef.current = distanceFromBottom <= 120
-  })
+  }, [])
 
   useEffect(() => {
     const element = scrollRef.current
     if (!element) return
-
-    updateScrollAnchor()
-    element.addEventListener('scroll', updateScrollAnchor, { passive: true })
-
+    handleScroll()
+    element.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
-      element.removeEventListener('scroll', updateScrollAnchor)
+      element.removeEventListener('scroll', handleScroll)
     }
-  }, [updateScrollAnchor])
+  }, [handleScroll])
 
   useEffect(() => {
     const element = scrollRef.current
