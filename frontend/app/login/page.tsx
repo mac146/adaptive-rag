@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -20,17 +22,27 @@ export default function LoginPage() {
 
     if (mode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setError(error.message)
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password })
       if (error) {
         setError(error.message)
+        setLoading(false)
       } else {
-        setSuccess('Account created! Check your email and click the confirmation link to continue.')
+        router.push('/')
+        router.refresh()
+      }
+    } else {
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+      } else if (data.session) {
+        // email confirmation is disabled — user is logged in immediately
+        router.push('/')
+        router.refresh()
+      } else {
+        setSuccess('Check your email and click the confirmation link to sign in.')
+        setLoading(false)
       }
     }
-
-    setLoading(false)
   }
 
   return (

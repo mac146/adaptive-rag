@@ -1,5 +1,4 @@
 import os
-import pickle
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
@@ -18,39 +17,34 @@ def get_connection():
     )
 
 
-def save_document(document_id: str, filename: str, profile: dict, sections: list, bm25_retriever, chunks: list):
-    bm25_bytes = pickle.dumps({
-        "retriever": bm25_retriever,
-        "chunks": chunks
-    })
-
+def save_document(document_id: str, filename: str, profile: dict, sections: list, **kwargs):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO documents (document_id, filename, profile, sections, bm25_index)
         VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (document_id) DO UPDATE
-        SET filename   = EXCLUDED.filename,
-            profile    = EXCLUDED.profile,
-            sections   = EXCLUDED.sections,
+        SET filename = EXCLUDED.filename,
+            profile  = EXCLUDED.profile,
+            sections = EXCLUDED.sections,
             bm25_index = EXCLUDED.bm25_index
     """, (
         document_id,
         filename,
         psycopg2.extras.Json(profile),
         psycopg2.extras.Json(sections),
-        bm25_bytes
+        b'',
     ))
     conn.commit()
     cur.close()
     conn.close()
 
 
-def load_document(document_id: str) -> dict:
+def load_document_meta(document_id: str) -> dict:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT document_id, filename, profile, sections, bm25_index
+        SELECT document_id, filename, profile, sections
         FROM documents
         WHERE document_id = %s
     """, (document_id,))
@@ -61,15 +55,11 @@ def load_document(document_id: str) -> dict:
     if not row:
         raise ValueError(f"Document {document_id} not found")
 
-    bm25_data = pickle.loads(row[4])
-
     return {
         "document_id": row[0],
         "filename":    row[1],
         "profile":     row[2],
         "sections":    row[3],
-        "retriever":   bm25_data["retriever"],
-        "chunks":      bm25_data["chunks"]
     }
 
 

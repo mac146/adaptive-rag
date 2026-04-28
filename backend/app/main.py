@@ -5,34 +5,36 @@ import shutil
 import os
 import litellm
 import tempfile
+import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 from app.api.pipeline import ingest_document, answer_question
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import jwt  
+import httpx
 
 load_dotenv()
 
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 security = HTTPBearer()
 
 
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if not SUPABASE_JWT_SECRET:
-        raise HTTPException(status_code=500, detail="JWT secret not configured.")
-    try:
-        payload = jwt.decode(
-            credentials.credentials,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        raise HTTPException(status_code=500, detail="Supabase not configured.")
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{SUPABASE_URL}/auth/v1/user",
+            headers={
+                "Authorization": f"Bearer {credentials.credentials}",
+                "apikey": SUPABASE_ANON_KEY,
+            },
+            timeout=10,
         )
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired.")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token.")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    return resp.json()
 
 OVERLOAD_ERROR_HINTS = (
     "overloaded",
@@ -147,7 +149,7 @@ async def upload_document(file: UploadFile = File(...), _: dict = Depends(verify
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
