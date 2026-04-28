@@ -102,7 +102,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://eclectic-sable-5fc2e5.netlify.app",
+        "https://eclectic-sable-5fc2e5.netlify.app",  # old Netlify (keep until Vercel is live)
     ],
     allow_credentials=True,
     allow_methods=["*"],
