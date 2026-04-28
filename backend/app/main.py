@@ -149,9 +149,11 @@ async def ask_question(request: QuestionRequest):
     context = "\n\n".join(context_parts)
 
     system_prompt = (
-        "You are a helpful assistant. Answer the question using only "
-        "the context below. If the answer cannot be found in the context, "
-        "say I don't know. Do not make anything up."
+        "You are a helpful assistant. Answer the question using the context below. "
+        "You may reason logically and draw inferences from the context — "
+        "if the answer can be deduced or inferred from what is stated, explain your reasoning clearly. "
+        "Only say 'I don't know' if the context provides no relevant information whatsoever. "
+        "Do not invent facts that are not supported by or inferable from the context."
     )
 
     user_message = f"Context:\n{context}\n\nQuestion: {request.question}"
