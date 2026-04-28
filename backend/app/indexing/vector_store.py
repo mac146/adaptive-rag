@@ -7,7 +7,7 @@ import uuid
 client = QdrantClient(
     url=os.getenv("QDRANT_URL"),
     api_key=os.getenv("QDRANT_API_KEY"),
-    timeout=15,
+    timeout=120,
 )
 
 def get_collection_name(document_id: str) -> str:
@@ -27,14 +27,13 @@ def store_chunks(chunks: list[dict], document_id: str):
     collection = get_collection_name(document_id)
     texts = [chunk["text"] for chunk in chunks]
     vectors = embed_batch(texts)
-    points = []
-    for chunk, vector in zip(chunks, vectors):
-        points.append(PointStruct(
-            id=str(uuid.uuid4()),
-            vector=vector,
-            payload={**chunk}
-        ))
-    client.upsert(collection_name=collection, points=points)
+    points = [
+        PointStruct(id=str(uuid.uuid4()), vector=vector, payload={**chunk})
+        for chunk, vector in zip(chunks, vectors)
+    ]
+    batch_size = 50
+    for i in range(0, len(points), batch_size):
+        client.upsert(collection_name=collection, points=points[i:i + batch_size])
 
 def search(query_text: str, document_id: str, top_k: int = 10, filter_section: str = None) -> list[dict]:
     collection = get_collection_name(document_id)

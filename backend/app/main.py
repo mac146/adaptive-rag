@@ -9,32 +9,8 @@ import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 from app.api.pipeline import ingest_document, answer_question
-from fastapi import Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import httpx
 
 load_dotenv()
-
-SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-security = HTTPBearer()
-
-
-async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-        raise HTTPException(status_code=500, detail="Supabase not configured.")
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{SUPABASE_URL}/auth/v1/user",
-            headers={
-                "Authorization": f"Bearer {credentials.credentials}",
-                "apikey": SUPABASE_ANON_KEY,
-            },
-            timeout=10,
-        )
-    if resp.status_code != 200:
-        raise HTTPException(status_code=401, detail="Invalid or expired token.")
-    return resp.json()
 
 OVERLOAD_ERROR_HINTS = (
     "overloaded",
@@ -92,13 +68,12 @@ def _complete_with_fallback(models, api_key, messages):
 
     raise last_error
 
-app=FastAPI(
+app = FastAPI(
     title="adaptive-rag",
     description="Structure-aware RAG system",
     version="0.1"
 )
 
-# Enable CORS for frontend
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
 _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
@@ -115,7 +90,6 @@ class QuestionRequest(BaseModel):
     document_id: str
     force_strategy: str = None
 
-    
 
 @app.get("/")
 def root():
@@ -123,7 +97,7 @@ def root():
 
 
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...), _: dict = Depends(verify_token)):
+async def upload_document(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename.")
 
@@ -156,8 +130,11 @@ async def upload_document(file: UploadFile = File(...), _: dict = Depends(verify
 
 
 @app.post("/ask")
-async def ask_question(request: QuestionRequest, _: dict = Depends(verify_token)):
-    pipeline_output = answer_question(request.question, request.document_id, request.force_strategy)
+async def ask_question(request: QuestionRequest):
+    try:
+        pipeline_output = answer_question(request.question, request.document_id, request.force_strategy)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
 
     chunks_used = pipeline_output["chunks_used"]
     max_context_chars = int(os.getenv("MAX_CONTEXT_CHARS", "8000"))
@@ -215,6 +192,3 @@ async def ask_question(request: QuestionRequest, _: dict = Depends(verify_token)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-
-
