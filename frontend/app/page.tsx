@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ChatArea } from '@/components/ChatArea'
 import { InputBar } from '@/components/InputBar'
 import { Sidebar } from '@/components/Sidebar'
-import { askQuestion, uploadDocument } from '@/lib/api'
+import { askQuestion, listDocuments, uploadDocument } from '@/lib/api'
 import type {
   AdaptiveDocument,
   AnswerMessage,
@@ -14,6 +14,25 @@ import type {
   UploadingState,
   UserMessage,
 } from '@/lib/types'
+
+function chatKey(documentId: string) {
+  return `chat_${documentId}`
+}
+
+function loadChat(documentId: string): ThreadMessage[] {
+  try {
+    const raw = localStorage.getItem(chatKey(documentId))
+    return raw ? (JSON.parse(raw) as ThreadMessage[]) : []
+  } catch {
+    return []
+  }
+}
+
+function saveChat(documentId: string, messages: ThreadMessage[]) {
+  try {
+    localStorage.setItem(chatKey(documentId), JSON.stringify(messages))
+  } catch {}
+}
 
 export default function Page() {
   const [documents, setDocuments] = useState<AdaptiveDocument[]>([])
@@ -26,6 +45,29 @@ export default function Page() {
   const [isAsking, setIsAsking] = useState(false)
   const activeRequestRef = useRef<AbortController | null>(null)
 
+  // Load documents from backend on mount
+  useEffect(() => {
+    listDocuments()
+      .then((docs) => {
+        setDocuments(
+          docs.map((d) => ({
+            id: d.document_id,
+            name: d.filename,
+            profile: d.profile,
+            uploadedAt: d.created_at,
+          })),
+        )
+      })
+      .catch(() => {})
+  }, [])
+
+  // Save chat to localStorage whenever messages change
+  useEffect(() => {
+    if (activeDocumentId && messages.length > 0) {
+      saveChat(activeDocumentId, messages)
+    }
+  }, [activeDocumentId, messages])
+
   const activeDocument = useMemo(
     () => documents.find((document) => document.id === activeDocumentId) ?? null,
     [activeDocumentId, documents],
@@ -33,6 +75,11 @@ export default function Page() {
   const inputDisabled = !activeDocument || isUploading
   const submitDisabled = inputDisabled || isAsking || !inputValue.trim()
   const controlsDisabled = !activeDocument || isUploading || isAsking
+
+  const handleSelectDocument = useCallback((documentId: string) => {
+    setActiveDocumentId(documentId)
+    setMessages(loadChat(documentId))
+  }, [])
 
   const handleUpload = useCallback(async (file: File) => {
     setIsUploading(true)
@@ -47,22 +94,23 @@ export default function Page() {
         uploadedAt: new Date().toISOString(),
       }
 
+      const welcomeMessage: AnswerMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        answer:
+          "Document indexed successfully. Ask about section intent, key findings, metrics, or any page-specific detail and I'll route the query automatically.",
+        createdAt: new Date().toISOString(),
+        strategy_used: 'hybrid',
+        reason: 'Initialization response after successful upload.',
+        confidence: 'high',
+        target_sections: [],
+        sources: [],
+      }
+
       setDocuments((current) => [uploadedDocument, ...current])
       setActiveDocumentId(uploadedDocument.id)
-      setMessages([
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          answer:
-            "Document indexed successfully. Ask about section intent, key findings, metrics, or any page-specific detail and I'll route the query automatically.",
-          createdAt: new Date().toISOString(),
-          strategy_used: 'hybrid',
-          reason: 'Initialization response after successful upload.',
-          confidence: 'high',
-          target_sections: [],
-          sources: [],
-        },
-      ])
+      setMessages([welcomeMessage])
+      saveChat(uploadedDocument.id, [welcomeMessage])
     } finally {
       setIsUploading(false)
       setUploadingState(null)
@@ -160,7 +208,7 @@ export default function Page() {
       <Sidebar
         documents={documents}
         activeDocumentId={activeDocumentId}
-        onSelectDocument={setActiveDocumentId}
+        onSelectDocument={handleSelectDocument}
         onUpload={handleUpload}
         isUploading={isUploading}
         uploadingState={uploadingState}

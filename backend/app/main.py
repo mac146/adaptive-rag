@@ -9,6 +9,7 @@ import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 from app.api.pipeline import ingest_document, answer_question
+from app.database import list_documents
 
 load_dotenv()
 
@@ -189,6 +190,14 @@ async def ask_question(request: QuestionRequest):
             for chunk in chunks_used
         ]
     }
+
+
+@app.get("/documents")
+async def get_documents():
+    try:
+        return list_documents()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/health")

@@ -67,7 +67,7 @@ def list_documents() -> list[dict]:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT document_id, filename, created_at
+        SELECT document_id, filename, profile, created_at
         FROM documents
         ORDER BY created_at DESC
     """)
@@ -79,7 +79,8 @@ def list_documents() -> list[dict]:
         {
             "document_id": row[0],
             "filename":    row[1],
-            "created_at":  str(row[2])
+            "profile":     row[2],
+            "created_at":  str(row[3])
         }
         for row in rows
     ]

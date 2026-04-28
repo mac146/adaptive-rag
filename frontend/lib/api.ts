@@ -93,6 +93,21 @@ export async function askQuestion(
   }
 }
 
+export interface DocumentListItem {
+  document_id: string
+  filename: string
+  profile: import('./types').DocumentProfile
+  created_at: string
+}
+
+export async function listDocuments(): Promise<DocumentListItem[]> {
+  const response = await fetch(`${API_BASE_URL}/documents`, {
+    method: 'GET',
+    cache: 'no-store',
+  })
+  return parseJson<DocumentListItem[]>(response)
+}
+
 export async function healthCheck(): Promise<HealthResponse> {
   const response = await fetch(`${API_BASE_URL}/health`, {
     method: 'GET',
