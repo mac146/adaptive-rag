@@ -6,6 +6,7 @@ import { ChatArea } from '@/components/ChatArea'
 import { InputBar } from '@/components/InputBar'
 import { Sidebar } from '@/components/Sidebar'
 import { askQuestion, listDocuments, uploadDocument } from '@/lib/api'
+import { createClient } from '@/lib/supabase/client'
 import type {
   AdaptiveDocument,
   AnswerMessage,
@@ -45,20 +46,24 @@ export default function Page() {
   const [isAsking, setIsAsking] = useState(false)
   const activeRequestRef = useRef<AbortController | null>(null)
 
-  // Load documents from backend on mount
+  // Load documents from backend on mount, filtered by current user
   useEffect(() => {
-    listDocuments()
-      .then((docs) => {
-        setDocuments(
-          docs.map((d) => ({
-            id: d.document_id,
-            name: d.filename,
-            profile: d.profile,
-            uploadedAt: d.created_at,
-          })),
-        )
-      })
-      .catch(() => {})
+    const supabase = createClient()
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const userId = session?.user?.id
+      listDocuments(userId)
+        .then((docs) => {
+          setDocuments(
+            docs.map((d) => ({
+              id: d.document_id,
+              name: d.filename,
+              profile: d.profile,
+              uploadedAt: d.created_at,
+            })),
+          )
+        })
+        .catch(() => {})
+    })
   }, [])
 
   // Save chat to localStorage whenever messages change
@@ -86,7 +91,10 @@ export default function Page() {
     setUploadingState({ fileName: file.name })
 
     try {
-      const response = await uploadDocument(file)
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const userId = session?.user?.id
+      const response = await uploadDocument(file, userId)
       const uploadedDocument: AdaptiveDocument = {
         id: response.document_id,
         name: file.name,

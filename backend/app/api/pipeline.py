@@ -10,7 +10,7 @@ from app.retrieval.router import decide_strategy
 from app.database import save_document, load_document_meta
 
 
-def ingest_document(file_path: str, filename: str) -> dict:
+def ingest_document(file_path: str, filename: str, user_id: str = None) -> dict:
     elements = parse_document(file_path)
     if not elements:
         raise ValueError("No parsable text found in document.")
@@ -36,6 +36,7 @@ def ingest_document(file_path: str, filename: str) -> dict:
         filename=filename,
         profile=profile,
         sections=sections_meta,
+        user_id=user_id,
     )
 
     return {

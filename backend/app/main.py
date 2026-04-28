@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import shutil
@@ -98,7 +98,7 @@ def root():
 
 
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), user_id: str = Form(default=None)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename.")
 
@@ -114,7 +114,7 @@ async def upload_document(file: UploadFile = File(...)):
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        result = ingest_document(temp_path, file.filename)
+        result = ingest_document(temp_path, file.filename, user_id=user_id)
 
         return {
             "message": "Document indexed successfully",
@@ -193,9 +193,9 @@ async def ask_question(request: QuestionRequest):
 
 
 @app.get("/documents")
-async def get_documents():
+async def get_documents(user_id: str = None):
     try:
-        return list_documents()
+        return list_documents(user_id=user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

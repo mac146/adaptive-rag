@@ -30,9 +30,10 @@ async function parseJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }
 
-export async function uploadDocument(file: File): Promise<UploadResponse> {
+export async function uploadDocument(file: File, userId?: string): Promise<UploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
+  if (userId) formData.append('user_id', userId)
   const authHeaders = await getAuthHeaders()
 
   const response = await fetch(`${API_BASE_URL}/upload`, {
@@ -100,11 +101,11 @@ export interface DocumentListItem {
   created_at: string
 }
 
-export async function listDocuments(): Promise<DocumentListItem[]> {
-  const response = await fetch(`${API_BASE_URL}/documents`, {
-    method: 'GET',
-    cache: 'no-store',
-  })
+export async function listDocuments(userId?: string): Promise<DocumentListItem[]> {
+  const url = userId
+    ? `${API_BASE_URL}/documents?user_id=${encodeURIComponent(userId)}`
+    : `${API_BASE_URL}/documents`
+  const response = await fetch(url, { method: 'GET', cache: 'no-store' })
   return parseJson<DocumentListItem[]>(response)
 }
 

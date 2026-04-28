@@ -17,23 +17,25 @@ def get_connection():
     )
 
 
-def save_document(document_id: str, filename: str, profile: dict, sections: list, **kwargs):
+def save_document(document_id: str, filename: str, profile: dict, sections: list, user_id: str = None):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
-        INSERT INTO documents (document_id, filename, profile, sections, bm25_index)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO documents (document_id, filename, profile, sections, bm25_index, user_id)
+        VALUES (%s, %s, %s, %s, %s, %s)
         ON CONFLICT (document_id) DO UPDATE
-        SET filename = EXCLUDED.filename,
-            profile  = EXCLUDED.profile,
-            sections = EXCLUDED.sections,
-            bm25_index = EXCLUDED.bm25_index
+        SET filename   = EXCLUDED.filename,
+            profile    = EXCLUDED.profile,
+            sections   = EXCLUDED.sections,
+            bm25_index = EXCLUDED.bm25_index,
+            user_id    = EXCLUDED.user_id
     """, (
         document_id,
         filename,
         psycopg2.extras.Json(profile),
         psycopg2.extras.Json(sections),
         b'',
+        user_id,
     ))
     conn.commit()
     cur.close()
@@ -63,14 +65,22 @@ def load_document_meta(document_id: str) -> dict:
     }
 
 
-def list_documents() -> list[dict]:
+def list_documents(user_id: str = None) -> list[dict]:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT document_id, filename, profile, created_at
-        FROM documents
-        ORDER BY created_at DESC
-    """)
+    if user_id:
+        cur.execute("""
+            SELECT document_id, filename, profile, created_at
+            FROM documents
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+        """, (user_id,))
+    else:
+        cur.execute("""
+            SELECT document_id, filename, profile, created_at
+            FROM documents
+            ORDER BY created_at DESC
+        """)
     rows = cur.fetchall()
     cur.close()
     conn.close()
