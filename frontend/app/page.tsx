@@ -16,26 +16,27 @@ import type {
   UserMessage,
 } from '@/lib/types'
 
-function chatKey(documentId: string) {
-  return `chat_${documentId}`
+function chatKey(userId: string, documentId: string) {
+  return `chat_${userId}_${documentId}`
 }
 
-function loadChat(documentId: string): ThreadMessage[] {
+function loadChat(userId: string, documentId: string): ThreadMessage[] {
   try {
-    const raw = localStorage.getItem(chatKey(documentId))
+    const raw = localStorage.getItem(chatKey(userId, documentId))
     return raw ? (JSON.parse(raw) as ThreadMessage[]) : []
   } catch {
     return []
   }
 }
 
-function saveChat(documentId: string, messages: ThreadMessage[]) {
+function saveChat(userId: string, documentId: string, messages: ThreadMessage[]) {
   try {
-    localStorage.setItem(chatKey(documentId), JSON.stringify(messages))
+    localStorage.setItem(chatKey(userId, documentId), JSON.stringify(messages))
   } catch {}
 }
 
 export default function Page() {
+  const [userId, setUserId] = useState<string | null>(null)
   const [documents, setDocuments] = useState<AdaptiveDocument[]>([])
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ThreadMessage[]>([])
@@ -46,12 +47,13 @@ export default function Page() {
   const [isAsking, setIsAsking] = useState(false)
   const activeRequestRef = useRef<AbortController | null>(null)
 
-  // Load documents from backend on mount, filtered by current user
+  // Load user + their documents on mount
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
-      const userId = session?.user?.id
-      listDocuments(userId)
+      const uid = session?.user?.id ?? null
+      setUserId(uid)
+      listDocuments(uid ?? undefined)
         .then((docs) => {
           setDocuments(
             docs.map((d) => ({
@@ -68,10 +70,10 @@ export default function Page() {
 
   // Save chat to localStorage whenever messages change
   useEffect(() => {
-    if (activeDocumentId && messages.length > 0) {
-      saveChat(activeDocumentId, messages)
+    if (userId && activeDocumentId && messages.length > 0) {
+      saveChat(userId, activeDocumentId, messages)
     }
-  }, [activeDocumentId, messages])
+  }, [userId, activeDocumentId, messages])
 
   const activeDocument = useMemo(
     () => documents.find((document) => document.id === activeDocumentId) ?? null,
@@ -83,18 +85,15 @@ export default function Page() {
 
   const handleSelectDocument = useCallback((documentId: string) => {
     setActiveDocumentId(documentId)
-    setMessages(loadChat(documentId))
-  }, [])
+    setMessages(userId ? loadChat(userId, documentId) : [])
+  }, [userId])
 
   const handleUpload = useCallback(async (file: File) => {
     setIsUploading(true)
     setUploadingState({ fileName: file.name })
 
     try {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      const userId = session?.user?.id
-      const response = await uploadDocument(file, userId)
+      const response = await uploadDocument(file, userId ?? undefined)
       const uploadedDocument: AdaptiveDocument = {
         id: response.document_id,
         name: file.name,
@@ -118,12 +117,12 @@ export default function Page() {
       setDocuments((current) => [uploadedDocument, ...current])
       setActiveDocumentId(uploadedDocument.id)
       setMessages([welcomeMessage])
-      saveChat(uploadedDocument.id, [welcomeMessage])
+      if (userId) saveChat(userId, uploadedDocument.id, [welcomeMessage])
     } finally {
       setIsUploading(false)
       setUploadingState(null)
     }
-  }, [])
+  }, [userId])
 
   const handleAsk = useCallback(async () => {
     const question = inputValue.trim()
