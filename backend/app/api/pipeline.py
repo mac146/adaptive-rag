@@ -9,20 +9,22 @@ from app.retrieval.retriever import retrieve
 from app.retrieval.router import decide_strategy
 from app.database import save_document, load_document_meta
 
-# In-memory BM25 cache: document_id -> retriever object
-# Each upload generates a new UUID so stale entries are naturally orphaned.
-# Cap at 20 entries to bound memory usage.
-_bm25_cache: dict = {}
+# Cache stores (chunks, retriever) TOGETHER so BM25 indices always map to the
+# correct chunk payloads. If we stored only the retriever and passed a fresh
+# Qdrant scroll (which returns chunks in UUID-sorted order, not ingestion order)
+# to keyword_search, the integer indices returned by BM25 would map to the wrong
+# chunks — producing results from completely unrelated parts of the document.
+_bm25_cache: dict[str, tuple[list, object]] = {}
 _BM25_CACHE_MAX = 20
 
 
-def _get_bm25(document_id: str, chunks: list[dict]):
+def _get_bm25(document_id: str, chunks: list[dict]) -> tuple[list, object]:
+    """Return (chunks, retriever) from cache, building if absent."""
     if document_id not in _bm25_cache:
         if len(_bm25_cache) >= _BM25_CACHE_MAX:
-            # Evict the oldest entry
             oldest = next(iter(_bm25_cache))
             del _bm25_cache[oldest]
-        _bm25_cache[document_id] = build_index(chunks)
+        _bm25_cache[document_id] = (chunks, build_index(chunks))
     return _bm25_cache[document_id]
 
 
@@ -42,8 +44,9 @@ def ingest_document(file_path: str, filename: str, user_id: str = None) -> dict:
     create_collection(document_id)
     store_chunks(chunks, document_id)
 
-    # Prime the BM25 cache immediately after ingestion
-    _bm25_cache[document_id] = build_index(chunks)
+    # Prime the BM25 cache with ingestion-order chunks so the first query
+    # doesn't need to rebuild the index from scratch.
+    _bm25_cache[document_id] = (chunks, build_index(chunks))
 
     sections_meta = [
         {k: s[k] for k in ("title", "level", "parent", "page", "word_count") if k in s}
@@ -70,16 +73,20 @@ def answer_question(question: str, document_id: str, force_strategy: str = None)
     profile  = meta["profile"]
     sections = meta["sections"]
 
-    # Fetch chunks from Qdrant (already stored there during ingest)
+    # Fetch chunks from Qdrant. These are used to populate the BM25 cache on a
+    # cache miss (e.g. after a server restart). On a cache hit we ignore the
+    # scroll order and use the cached chunks list instead, because BM25 indices
+    # are positional — they must index into the exact same list that was used
+    # when build_index() was called.
     scroll_result = client.scroll(
         collection_name=get_collection_name(document_id),
         limit=10000,
         with_payload=True,
         with_vectors=False,
     )
-    chunks = [point.payload for point in scroll_result[0]]
+    scroll_chunks = [point.payload for point in scroll_result[0]]
 
-    retriever = _get_bm25(document_id, chunks)
+    bm25_chunks, retriever = _get_bm25(document_id, scroll_chunks)
 
     strategy_output = decide_strategy(profile, question, sections, force_strategy)
 
@@ -88,7 +95,7 @@ def answer_question(question: str, document_id: str, force_strategy: str = None)
         strategy_output=strategy_output,
         document_id=document_id,
         retriever=retriever,
-        chunks=chunks,
+        chunks=bm25_chunks,  # Must match the list used to build the BM25 index
     )
 
     if not retrieved_chunks:
