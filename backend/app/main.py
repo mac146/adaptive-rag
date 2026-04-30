@@ -26,6 +26,8 @@ OVERLOAD_ERROR_HINTS = (
     "unavailable",
 )
 
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".md", ".txt"}
+
 
 def _parse_model_list(raw: str):
     return [model.strip() for model in raw.split(",") if model.strip()]
@@ -103,7 +105,7 @@ async def upload_document(file: UploadFile = File(...), user_id: str = Form(defa
         raise HTTPException(status_code=400, detail="Missing filename.")
 
     ext = Path(file.filename).suffix.lower()
-    if ext not in {".pdf", ".docx", ".md", ".txt"}:
+    if ext not in SUPPORTED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
@@ -132,6 +134,13 @@ async def upload_document(file: UploadFile = File(...), user_id: str = Form(defa
 
 @app.post("/ask")
 async def ask_question(request: QuestionRequest):
+    api_key = os.getenv("LITELLM_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="No LLM API key configured. Set LITELLM_API_KEY, GOOGLE_API_KEY, or OPENAI_API_KEY."
+        )
+
     try:
         pipeline_output = answer_question(request.question, request.document_id, request.force_strategy)
     except Exception as e:
@@ -162,7 +171,6 @@ async def ask_question(request: QuestionRequest):
     primary_model = os.getenv("LITELLM_MODEL", "gemini/gemini-2.5-flash")
     fallback_models = _parse_fallback_models(primary_model)
     models_to_try = [primary_model, *fallback_models]
-    api_key = os.getenv("LITELLM_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("OPENAI_API_KEY")
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user",   "content": user_message}

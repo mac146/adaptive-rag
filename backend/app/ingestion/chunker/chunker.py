@@ -1,9 +1,10 @@
 def chunk_sections(sections, profile):
-    score = profile["structure_score"]  # fixed key name
+    score = profile["structure_score"]
     if score == "high":
-        return hierarchical_chunking(sections)
+        chunks = hierarchical_chunking(sections)
     else:
-        return fixed_chunking(sections)
+        chunks = fixed_chunking(sections)
+    return [c for c in chunks if c.get("text", "").strip()]
 
 
 def make_chunk_id(title, index):
@@ -26,7 +27,7 @@ def hierarchical_chunking(sections):
             continue
 
         elif word_count <= 500:
-            
+
             chunk_index = len(results) + 1
             results.append({
                 "chunk_id": make_chunk_id(section["title"], chunk_index),
@@ -42,7 +43,7 @@ def hierarchical_chunking(sections):
             leftover_meta = None
 
         else:
-            
+
             words = combined_text.split()
             chunk_size = 400
             overlap = 50
@@ -70,7 +71,7 @@ def hierarchical_chunking(sections):
             leftover_text = ""
             leftover_meta = None
 
-   
+
     if leftover_text.strip():
         chunk_index = len(results) + 1
         meta = leftover_meta or {}
@@ -94,7 +95,7 @@ def fixed_chunking(sections):
     overlap = 50
     step = chunk_size - overlap
 
-    
+
     for section in sections:
         words = section["content"].split()
 

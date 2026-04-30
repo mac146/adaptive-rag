@@ -4,7 +4,11 @@ from markdown_it import MarkdownIt
 
 
 def parse_pdf(file_path: str) -> list[dict]:
-    doc = fitz.open(file_path)
+    try:
+        doc = fitz.open(file_path)
+    except Exception as e:
+        raise ValueError(f"Cannot open PDF: {e}")
+
     elements = []
 
     for page_num, page in enumerate(doc, start=1):
@@ -61,7 +65,11 @@ def parse_pdf(file_path: str) -> list[dict]:
 
 
 def parse_docx(file_path: str) -> list[dict]:
-    doc = docx.Document(file_path)
+    try:
+        doc = docx.Document(file_path)
+    except Exception as e:
+        raise ValueError(f"Cannot open DOCX: {e}")
+
     elements = []
 
     for para in doc.paragraphs:
@@ -71,7 +79,10 @@ def parse_docx(file_path: str) -> list[dict]:
 
         style = para.style.name if para.style else ""
         if style.startswith("Heading"):
-            level = int(style.split()[-1])
+            try:
+                level = int(style.split()[-1])
+            except (ValueError, IndexError):
+                level = 2
             elements.append({
                 "type": "heading",
                 "level": level,
@@ -89,8 +100,11 @@ def parse_docx(file_path: str) -> list[dict]:
 
 
 def parse_markdown(file_path: str) -> list[dict]:
-    with open(file_path, "r", encoding="utf-8") as f:
-        md_content = f.read()
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            md_content = f.read()
+    except Exception as e:
+        raise ValueError(f"Cannot read file: {e}")
 
     md = MarkdownIt()
     tokens = md.parse(md_content)
@@ -128,12 +142,34 @@ def parse_markdown(file_path: str) -> list[dict]:
     return elements
 
 
+def parse_text(file_path: str) -> list[dict]:
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+    except Exception as e:
+        raise ValueError(f"Cannot read text file: {e}")
+
+    elements = []
+    for line in content.splitlines():
+        text = line.strip()
+        if text:
+            elements.append({
+                "type": "paragraph",
+                "level": None,
+                "text": text,
+                "page": None,
+            })
+    return elements
+
+
 def parse_document(file_path: str) -> list[dict]:
     if file_path.endswith(".pdf"):
         return parse_pdf(file_path)
     elif file_path.endswith(".docx"):
         return parse_docx(file_path)
-    elif file_path.endswith(".md") or file_path.endswith('.txt'):
+    elif file_path.endswith(".md"):
         return parse_markdown(file_path)
+    elif file_path.endswith(".txt"):
+        return parse_text(file_path)
     else:
         raise ValueError(f"Unsupported file format: {file_path}")

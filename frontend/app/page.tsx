@@ -16,6 +16,8 @@ import type {
   UserMessage,
 } from '@/lib/types'
 
+const CHAT_MAX_MESSAGES = 200
+
 function chatKey(userId: string, documentId: string) {
   return `chat_${userId}_${documentId}`
 }
@@ -29,10 +31,22 @@ function loadChat(userId: string, documentId: string): ThreadMessage[] {
   }
 }
 
-function saveChat(userId: string, documentId: string, messages: ThreadMessage[]) {
+function saveChat(
+  userId: string,
+  documentId: string,
+  messages: ThreadMessage[],
+  onQuotaExceeded?: () => void,
+) {
+  const capped = messages.length > CHAT_MAX_MESSAGES
+    ? messages.slice(-CHAT_MAX_MESSAGES)
+    : messages
   try {
-    localStorage.setItem(chatKey(userId, documentId), JSON.stringify(messages))
-  } catch {}
+    localStorage.setItem(chatKey(userId, documentId), JSON.stringify(capped))
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+      onQuotaExceeded?.()
+    }
+  }
 }
 
 export default function Page() {
@@ -45,6 +59,7 @@ export default function Page() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadingState, setUploadingState] = useState<UploadingState | null>(null)
   const [isAsking, setIsAsking] = useState(false)
+  const [storageError, setStorageError] = useState(false)
   const activeRequestRef = useRef<AbortController | null>(null)
 
   // Load user + their documents on mount
@@ -71,7 +86,7 @@ export default function Page() {
   // Save chat to localStorage whenever messages change
   useEffect(() => {
     if (userId && activeDocumentId && messages.length > 0) {
-      saveChat(userId, activeDocumentId, messages)
+      saveChat(userId, activeDocumentId, messages, () => setStorageError(true))
     }
   }, [userId, activeDocumentId, messages])
 
@@ -221,6 +236,14 @@ export default function Page() {
         uploadingState={uploadingState}
       />
       <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {storageError && (
+          <div className="flex items-center justify-between bg-destructive/10 px-4 py-2 text-xs text-destructive">
+            <span>Chat history storage is full. Oldest messages will be trimmed automatically.</span>
+            <button onClick={() => setStorageError(false)} className="ml-4 font-medium underline">
+              Dismiss
+            </button>
+          </div>
+        )}
         <ChatArea activeDocument={activeDocument} messages={messages} isLoading={isAsking} />
         <InputBar
           value={inputValue}

@@ -1,7 +1,7 @@
 import os
 from qdrant_client import QdrantClient
 from app.indexing.embedder import embed_batch, embed_text
-from qdrant_client.models import Distance, VectorParams, PointStruct,Filter,FieldCondition,MatchValue
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 import uuid
 
 client = QdrantClient(
@@ -15,13 +15,21 @@ def get_collection_name(document_id: str) -> str:
 
 def create_collection(document_id: str):
     collection = get_collection_name(document_id)
-    existing = [c.name for c in client.get_collections().collections]
-    if collection in existing:
-        client.delete_collection(collection)
-    client.create_collection(
-        collection_name=collection,
-        vectors_config=VectorParams(size=384, distance=Distance.COSINE)
-    )
+    try:
+        existing = [c.name for c in client.get_collections().collections]
+        if collection in existing:
+            client.delete_collection(collection)
+        client.create_collection(
+            collection_name=collection,
+            vectors_config=VectorParams(size=384, distance=Distance.COSINE)
+        )
+    except Exception as e:
+        # Attempt cleanup so we don't leave a half-created collection
+        try:
+            client.delete_collection(collection)
+        except Exception:
+            pass
+        raise RuntimeError(f"Failed to create Qdrant collection '{collection}': {e}") from e
 
 def store_chunks(chunks: list[dict], document_id: str):
     collection = get_collection_name(document_id)
