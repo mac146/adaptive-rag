@@ -2,30 +2,30 @@
 @import 'tw-animate-css';
 
 :root {
-  --background: #f7f7fa;
-  --foreground: #161622;
-  --card: #ffffff;
-  --card-foreground: #161622;
-  --popover: #ffffff;
-  --popover-foreground: #161622;
-  --primary: #534ab7;
+  --background: #040812;
+  --foreground: #f3f7ff;
+  --card: rgba(255, 255, 255, 0.06);
+  --card-foreground: #f3f7ff;
+  --popover: #081120;
+  --popover-foreground: #f3f7ff;
+  --primary: #4f8cff;
   --primary-foreground: #ffffff;
-  --secondary: #f1f1f8;
-  --secondary-foreground: #1f2140;
-  --muted: #f3f3f7;
-  --muted-foreground: #56586a;
-  --accent: #ececf5;
-  --accent-foreground: #161622;
-  --destructive: #c95b5b;
+  --secondary: rgba(255, 255, 255, 0.08);
+  --secondary-foreground: #d9e7ff;
+  --muted: rgba(255, 255, 255, 0.06);
+  --muted-foreground: rgba(226, 232, 240, 0.72);
+  --accent: rgba(255, 255, 255, 0.08);
+  --accent-foreground: #f3f7ff;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: rgba(46, 47, 71, 0.14);
-  --input: rgba(46, 47, 71, 0.14);
-  --ring: rgba(83, 74, 183, 0.35);
-  --radius: 0;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: rgba(96, 165, 250, 0.35);
+  --radius: 1.25rem;
 }
 
 @theme inline {
-  --font-sans: 'Segoe UI', 'Trebuchet MS', 'Helvetica Neue', sans-serif;
+  --font-sans: 'Sora', 'Segoe UI', 'Helvetica Neue', sans-serif;
   --font-mono: 'Consolas', 'Courier New', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -46,10 +46,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-xl: 0;
+  --radius-sm: calc(var(--radius) - 0.5rem);
+  --radius-md: calc(var(--radius) - 0.25rem);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 0.5rem);
 }
 
 @layer base {
@@ -57,18 +57,48 @@
     @apply border-border outline-ring/50;
   }
 
-  html,
-  body {
-    @apply h-screen overflow-hidden;
-  }
-
   body {
     @apply bg-background text-[13px] text-foreground;
+    background-image:
+      radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 20%),
+      radial-gradient(circle at top right, rgba(124, 58, 237, 0.12), transparent 22%);
+    background-attachment: fixed;
+  }
+
+  html,
+  body {
+    @apply h-full;
+    scroll-behavior: smooth;
   }
 
   .message-row {
     /* Reduce layout/paint work for offscreen chat history without changing UI. */
     content-visibility: auto;
     contain-intrinsic-size: 220px;
+  }
+
+  .app-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.22) transparent;
+  }
+
+  .app-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background-clip: padding-box;
+    background-color: rgba(148, 163, 184, 0.22);
+  }
+
+  .app-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(148, 163, 184, 0.34);
   }
 }

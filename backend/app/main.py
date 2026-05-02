@@ -1,5 +1,6 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 import shutil
 import os
@@ -8,6 +9,7 @@ import tempfile
 import traceback
 from pathlib import Path
 from dotenv import load_dotenv
+import httpx
 from app.api.pipeline import ingest_document, answer_question
 from app.database import list_documents
 
@@ -27,6 +29,7 @@ OVERLOAD_ERROR_HINTS = (
 )
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".md", ".txt"}
+auth_scheme = HTTPBearer(auto_error=False)
 
 
 def _parse_model_list(raw: str):
@@ -71,6 +74,55 @@ def _complete_with_fallback(models, api_key, messages):
 
     raise last_error
 
+
+async def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(auth_scheme),
+) -> str:
+    if not credentials or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required.",
+        )
+
+    supabase_url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    supabase_anon_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    if not supabase_url or not supabase_anon_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Supabase auth is not configured on the backend.",
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{supabase_url.rstrip('/')}/auth/v1/user",
+                headers={
+                    "Authorization": f"Bearer {credentials.credentials}",
+                    "apikey": supabase_anon_key,
+                },
+            )
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Unable to verify auth session: {error}",
+        ) from error
+
+    if response.status_code != status.HTTP_200_OK:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired auth token.",
+        )
+
+    user_payload = response.json()
+    user_id = user_payload.get("id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authenticated user id missing from token.",
+        )
+
+    return user_id
+
 app = FastAPI(
     title="adaptive-rag",
     description="Structure-aware RAG system",
@@ -100,7 +152,10 @@ def root():
 
 
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...), user_id: str = Form(default=None)):
+async def upload_document(
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id),
+):
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename.")
 
@@ -133,7 +188,10 @@ async def upload_document(file: UploadFile = File(...), user_id: str = Form(defa
 
 
 @app.post("/ask")
-async def ask_question(request: QuestionRequest):
+async def ask_question(
+    request: QuestionRequest,
+    user_id: str = Depends(get_current_user_id),
+):
     api_key = os.getenv("LITELLM_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise HTTPException(
@@ -142,7 +200,12 @@ async def ask_question(request: QuestionRequest):
         )
 
     try:
-        pipeline_output = answer_question(request.question, request.document_id, request.force_strategy)
+        pipeline_output = answer_question(
+            request.question,
+            request.document_id,
+            request.force_strategy,
+            user_id=user_id,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
 
@@ -201,7 +264,7 @@ async def ask_question(request: QuestionRequest):
 
 
 @app.get("/documents")
-async def get_documents(user_id: str = None):
+async def get_documents(user_id: str = Depends(get_current_user_id)):
     try:
         return list_documents(user_id=user_id)
     except Exception as e:

@@ -67,8 +67,13 @@ def ingest_document(file_path: str, filename: str, user_id: str = None) -> dict:
     }
 
 
-def answer_question(question: str, document_id: str, force_strategy: str = None) -> dict:
-    meta = load_document_meta(document_id)
+def answer_question(
+    question: str,
+    document_id: str,
+    force_strategy: str = None,
+    user_id: str | None = None,
+) -> dict:
+    meta = load_document_meta(document_id, user_id=user_id)
 
     profile  = meta["profile"]
     sections = meta["sections"]

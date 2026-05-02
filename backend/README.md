@@ -24,8 +24,9 @@ Adaptive RAG is a structure-aware retrieval-augmented generation (RAG) system th
 ## API Endpoints
 - `GET /` - Health message
 - `GET /health` - Basic health check
-- `POST /upload` - Upload and index a document
-- `POST /ask` - Ask a question
+- `POST /upload` - Upload and index a document, requires auth
+- `POST /ask` - Ask a question, requires auth
+- `GET /documents` - List the signed-in user's documents, requires auth
 
 ## Local Storage (Testing Mode)
 These files and folders are created on disk during testing:
@@ -39,6 +40,14 @@ See `requirements.txt` for dependencies.
 ## Run Locally
 ```bash
 uvicorn app.main:app --reload
+```
+
+Set Supabase auth env vars for backend token verification:
+
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+```
 
 ## Notes
 - This build is not hardened for concurrent users.

@@ -44,15 +44,22 @@ def save_document(document_id: str, filename: str, profile: dict, sections: list
         conn.close()
 
 
-def load_document_meta(document_id: str) -> dict:
+def load_document_meta(document_id: str, user_id: str | None = None) -> dict:
     conn = get_connection()
     try:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT document_id, filename, profile, sections
-            FROM documents
-            WHERE document_id = %s
-        """, (document_id,))
+        if user_id:
+            cur.execute("""
+                SELECT document_id, filename, profile, sections
+                FROM documents
+                WHERE document_id = %s AND user_id = %s
+            """, (document_id, user_id))
+        else:
+            cur.execute("""
+                SELECT document_id, filename, profile, sections
+                FROM documents
+                WHERE document_id = %s
+            """, (document_id,))
         row = cur.fetchone()
         cur.close()
     finally:

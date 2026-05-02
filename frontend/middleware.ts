@@ -21,12 +21,15 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const { pathname } = request.nextUrl
 
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // Landing page is public
+  if (pathname === '/') {
+    return response
   }
 
-  if (user && request.nextUrl.pathname === '/login') {
+  // All other routes require auth — bounce to landing
+  if (!user) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
