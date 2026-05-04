@@ -14,7 +14,7 @@ import type {
   ConfidenceLabel,
   StrategyLabel,
 } from '@/components/chat/types'
-import { askQuestion, listDocuments, uploadDocument } from '@/lib/api'
+import { askQuestion, deleteDocument, listDocuments, uploadDocument } from '@/lib/api'
 import { createClient } from '@/lib/supabase/client'
 import type {
   AdaptiveDocument,
@@ -256,7 +256,7 @@ export default function DashboardPage() {
 
       if (!uid) return
 
-      listDocuments(uid)
+      listDocuments()
         .then((apiDocuments) => {
           const mapped = apiDocuments.map(mapDocument)
           setDocuments(mapped)
@@ -299,6 +299,31 @@ export default function DashboardPage() {
     setIsThinking(false)
   }, [])
 
+  const handleDeleteDocument = useCallback(async (documentId: string) => {
+    if (!userId) return
+
+    try {
+      await deleteDocument(documentId)
+    } catch {
+      // Best-effort: clean up locally even if the API call fails
+    }
+
+    localStorage.removeItem(chatKey(userId, documentId))
+
+    setDocuments((prev) => {
+      const remaining = prev.filter((d) => d.id !== documentId)
+      setActiveDocumentId((active) =>
+        active === documentId ? (remaining[0]?.id ?? null) : active
+      )
+      return remaining
+    })
+
+    setMessagesByDocument((current) => {
+      const { [documentId]: _removed, ...rest } = current
+      return rest
+    })
+  }, [userId])
+
   function handleUploadClick() {
     fileInputRef.current?.click()
   }
@@ -317,7 +342,7 @@ export default function DashboardPage() {
     setUploadingState({ fileName: file.name })
 
     try {
-      const response = await uploadDocument(file, userId ?? undefined)
+      const response = await uploadDocument(file)
       const uploadedDocument: ChatDocument = mapDocument({
         document_id: response.document_id,
         filename: file.name,
@@ -405,6 +430,7 @@ export default function DashboardPage() {
           documents={documents}
           activeDocumentId={activeDocument?.id ?? ''}
           onSelectDocument={handleSelectDocument}
+          onDeleteHistory={handleDeleteDocument}
           onUploadClick={handleUploadClick}
           onLogout={handleLogout}
         />

@@ -76,6 +76,7 @@ def build_sections(elements: list[dict]) -> list[dict]:
                 "parent": parent,
                 "page": elem.get("page"),
                 "content": [],
+                "items": [],
                 "word_count": 0
             }
 
@@ -88,6 +89,14 @@ def build_sections(elements: list[dict]) -> list[dict]:
         elif elem["type"] == "paragraph":
             if current_section:
                 current_section["content"].append(elem["text"])
+                current_section["items"].append({
+                    "text": elem["text"],
+                    "page": elem.get("page"),
+                    "section_title": elem.get("section_title", current_section["title"]),
+                    "is_table_row": elem.get("is_table_row", False),
+                    "table_index": elem.get("table_index"),
+                    "row_index": elem.get("row_index"),
+                })
             else:
                 # paragraph before first heading
                 sections.append({
@@ -96,6 +105,14 @@ def build_sections(elements: list[dict]) -> list[dict]:
                     "parent": None,
                     "page": elem.get("page"),
                     "content": elem["text"],
+                    "items": [{
+                        "text": elem["text"],
+                        "page": elem.get("page"),
+                        "section_title": elem.get("section_title"),
+                        "is_table_row": elem.get("is_table_row", False),
+                        "table_index": elem.get("table_index"),
+                        "row_index": elem.get("row_index"),
+                    }],
                     "word_count": len(elem["text"].split())
                 })
 
@@ -123,6 +140,8 @@ def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
     total_words = sum(s["word_count"] for s in titled_sections)
     heading_levels = sorted(set(h["level"] for h in headings))
     word_counts = [s["word_count"] for s in titled_sections if s["word_count"] > 0]
+    table_count = len({e.get("table_index") for e in elements if e.get("is_table_row") and e.get("table_index") is not None})
+    has_tables = table_count > 0
 
     # section size variance — are sections evenly sized?
     if len(word_counts) > 1:
@@ -142,6 +161,9 @@ def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
     else:
         structure_score = "low"
 
+    if table_count >= 3 and structure_score == "low":
+        structure_score = "medium"
+
     # length classification
     if total_words > 10000:
         length = "long"
@@ -149,6 +171,8 @@ def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
         length = "medium"
     else:
         length = "short"
+
+    table_density = table_count / max(len(titled_sections), 1)
 
     return {
         "total_words": total_words,
@@ -158,5 +182,7 @@ def build_document_profile(sections: list[dict], elements: list[dict]) -> dict:
         "size_variance": size_variance,         # "high" or "low"
         "structure_score": structure_score,     # "high", "medium", "low"
         "length": length,                       # "short", "medium", "long"
+        "has_tables": has_tables,
+        "table_density": table_density,
     }
 

@@ -30,7 +30,7 @@ async function parseJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }
 
-export async function uploadDocument(file: File, userId?: string): Promise<UploadResponse> {
+export async function uploadDocument(file: File): Promise<UploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
   const authHeaders = await getAuthHeaders()
@@ -100,7 +100,7 @@ export interface DocumentListItem {
   created_at: string
 }
 
-export async function listDocuments(userId?: string): Promise<DocumentListItem[]> {
+export async function listDocuments(): Promise<DocumentListItem[]> {
   const authHeaders = await getAuthHeaders()
   const response = await fetch(`${API_BASE_URL}/documents`, {
     method: 'GET',
@@ -108,6 +108,22 @@ export async function listDocuments(userId?: string): Promise<DocumentListItem[]
     headers: authHeaders,
   })
   return parseJson<DocumentListItem[]>(response)
+}
+
+export async function deleteDocument(documentId: string): Promise<void> {
+  const authHeaders = await getAuthHeaders()
+  const response = await fetch(`${API_BASE_URL}/documents/${encodeURIComponent(documentId)}`, {
+    method: 'DELETE',
+    headers: authHeaders,
+  })
+  if (!response.ok) {
+    let message = 'Failed to delete document.'
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      message = payload.detail ?? message
+    } catch {}
+    throw new Error(message)
+  }
 }
 
 export async function healthCheck(): Promise<HealthResponse> {

@@ -5,7 +5,7 @@ def build_index(chunks: list[dict]):
     retriever = bm25s.BM25()
     tokenized = bm25s.tokenize(documents)
     retriever.index(tokenized)
-    return retriever 
+    return retriever
 
 
 def search(
@@ -15,16 +15,20 @@ def search(
     top_k: int = 10,
     filter_section: str | None = None,
 ) -> list[dict]:
-    k = min(top_k, len(chunks)) if chunks else 0
-    if k == 0:
+    if not chunks:
         return []
+
+    # When filtering by section, retrieve more candidates before filtering so
+    # we don't silently return 0 results if the top-k BM25 hits all happen to
+    # be from other sections.
+    fetch_k = min(top_k * 4 if filter_section else top_k, len(chunks))
 
     tokenized_query = bm25s.tokenize([query_text])
     results, scores = retriever.retrieve(
         tokenized_query,
-        k=k,
+        k=fetch_k,
         return_as="tuple",
-        show_progress=False
+        show_progress=False,
     )
 
     output = []
@@ -32,10 +36,7 @@ def search(
         chunk = chunks[idx]
         if filter_section is not None and chunk.get("section_title") != filter_section:
             continue
-        output.append({
-            **chunk,
-            "score": float(score)
-        })
+        output.append({**chunk, "score": float(score)})
         if len(output) >= top_k:
             break
     return output

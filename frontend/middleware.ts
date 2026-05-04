@@ -23,7 +23,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
-  // Landing page is public
+  // Landing page is public for everyone
   if (pathname === '/') {
     return response
   }

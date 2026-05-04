@@ -76,6 +76,25 @@ def load_document_meta(document_id: str, user_id: str | None = None) -> dict:
     }
 
 
+def delete_document(document_id: str, user_id: str | None = None) -> bool:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        if user_id:
+            cur.execute(
+                "DELETE FROM documents WHERE document_id = %s AND user_id = %s",
+                (document_id, user_id),
+            )
+        else:
+            cur.execute("DELETE FROM documents WHERE document_id = %s", (document_id,))
+        deleted = cur.rowcount > 0
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+    return deleted
+
+
 def list_documents(user_id: str = None) -> list[dict]:
     conn = get_connection()
     try:

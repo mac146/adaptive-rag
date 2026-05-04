@@ -7,12 +7,19 @@ import { createClient } from '@/lib/supabase/client'
 
 const BAR_HEIGHTS = [14, 22, 36, 52, 70, 88, 106, 124, 138, 128, 110, 92, 76, 60, 48, 62, 80, 98, 118, 106, 82, 60, 42, 28, 18, 12]
 const GITHUB_URL = 'https://github.com/mac146/adaptive-rag'
+const BACKGROUND_STORAGE_KEY = 'landing_background_theme'
+const BACKGROUND_THEMES = [
+  'radial-gradient(ellipse 90% 80% at 68% 50%, #0d2045 0%, #071120 55%, #050912 100%)',
+  'radial-gradient(circle at 18% 18%, rgba(28, 95, 161, 0.65), transparent 28%), radial-gradient(circle at 82% 18%, rgba(14, 165, 233, 0.28), transparent 24%), linear-gradient(135deg, #04101d 0%, #082032 44%, #06111f 100%)',
+  'radial-gradient(circle at top left, rgba(34, 197, 94, 0.2), transparent 24%), radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.22), transparent 28%), linear-gradient(160deg, #03120f 0%, #08211c 52%, #04110d 100%)',
+] as const
 
 type AuthMode = 'login' | 'signup'
 
 export default function LandingPage() {
   const router = useRouter()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
   const [showAuth, setShowAuth] = useState(false)
   const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
@@ -20,12 +27,32 @@ export default function LandingPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [backgroundIndex, setBackgroundIndex] = useState(0)
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
       setIsLoggedIn(!!user)
+      setUserEmail(user?.email ?? '')
     })
+
+    const savedIndex = window.localStorage.getItem(BACKGROUND_STORAGE_KEY)
+    if (!savedIndex) return
+
+    const parsed = Number.parseInt(savedIndex, 10)
+    if (Number.isNaN(parsed)) return
+
+    setBackgroundIndex(((parsed % BACKGROUND_THEMES.length) + BACKGROUND_THEMES.length) % BACKGROUND_THEMES.length)
   }, [])
+
+  function handleBackgroundChange() {
+    setBackgroundIndex((current) => {
+      const next = (current + 1) % BACKGROUND_THEMES.length
+      window.localStorage.setItem(BACKGROUND_STORAGE_KEY, String(next))
+      return next
+    })
+  }
+
+  const userInitial = userEmail.trim().charAt(0).toUpperCase()
 
   function openAuth(mode: AuthMode = 'login') {
     setAuthMode(mode)
@@ -46,7 +73,7 @@ export default function LandingPage() {
 
   function handleCTAClick() {
     if (isLoggedIn) {
-      router.push('/dashboard')
+      router.push('/chat')
     } else {
       openAuth('login')
     }
@@ -64,7 +91,7 @@ export default function LandingPage() {
         setError(error.message)
         setLoading(false)
       } else {
-        router.push('/dashboard')
+        router.push('/chat')
         router.refresh()
       }
     } else {
@@ -73,7 +100,7 @@ export default function LandingPage() {
         setError(error.message)
         setLoading(false)
       } else if (data.session) {
-        router.push('/dashboard')
+        router.push('/chat')
         router.refresh()
       } else {
         setSuccess('Check your email to confirm your account, then sign in.')
@@ -86,8 +113,7 @@ export default function LandingPage() {
     <div
       className="relative flex min-h-screen flex-col overflow-x-hidden text-white"
       style={{
-        background:
-          'radial-gradient(ellipse 90% 80% at 68% 50%, #0d2045 0%, #071120 55%, #050912 100%)',
+        background: BACKGROUND_THEMES[backgroundIndex],
       }}
     >
       {/* Concentric arc decoration */}
@@ -132,21 +158,27 @@ export default function LandingPage() {
         </div>
 
         <button
-          onClick={() => isLoggedIn ? router.push('/dashboard') : openAuth('login')}
+          onClick={() => isLoggedIn ? router.push('/chat') : openAuth('login')}
           className="rounded-full border border-white/[0.18] bg-white/[0.05] px-5 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/[0.09] hover:text-white"
         >
-          {isLoggedIn ? 'Go to App' : 'Sign in / Sign up'}
+          {isLoggedIn ? 'Go to App' : 'Continue'}
         </button>
       </nav>
 
       {/* Left floating icon buttons */}
-      <div className="pointer-events-none absolute left-9 top-1/2 z-10 flex -translate-y-[58%] flex-col gap-5">
-        <div className="flex h-[54px] w-[54px] items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.04]">
-          <User className="h-5 w-5 text-white/35" />
+      <div className="absolute left-9 top-1/2 z-30 flex -translate-y-[58%] flex-col gap-5">
+        <div className="flex h-[54px] w-[54px] items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.04] text-sm font-semibold text-white/75">
+          {userInitial || <User className="h-5 w-5 text-white/35" />}
         </div>
-        <div className="flex h-[54px] w-[54px] items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.04]">
+        <button
+          type="button"
+          onClick={handleBackgroundChange}
+          className="flex h-[54px] w-[54px] items-center justify-center rounded-full border border-white/[0.1] bg-white/[0.04] transition-colors hover:bg-white/[0.08]"
+          aria-label="Change background"
+          title="Change background"
+        >
           <Sun className="h-5 w-5 text-white/35" />
-        </div>
+        </button>
       </div>
 
       {/* Right floating icon */}
@@ -245,13 +277,13 @@ export default function LandingPage() {
                   onClick={() => { setSuccess(null); setAuthMode('login') }}
                   className="w-full rounded-xl bg-[#534AB7] py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
                 >
-                  Back to sign in
+                  Continue
                 </button>
               </div>
             ) : (
               <>
                 <h2 className="mb-5 text-[20px] font-bold text-white">
-                  {authMode === 'login' ? 'Welcome back' : 'Create account'}
+                  {authMode === 'login' ? 'Welcome back' : 'Get started'}
                 </h2>
 
                 <form onSubmit={handleSubmit} className="space-y-3">
@@ -281,9 +313,7 @@ export default function LandingPage() {
                   >
                     {loading
                       ? 'Please wait...'
-                      : authMode === 'login'
-                      ? 'Sign in'
-                      : 'Create account'}
+                      : 'Continue'}
                   </button>
                 </form>
 
@@ -295,8 +325,8 @@ export default function LandingPage() {
                   className="mt-4 w-full text-center text-[11px] text-white/30 transition-colors hover:text-white/55"
                 >
                   {authMode === 'login'
-                    ? "Don't have an account? Sign up"
-                    : 'Already have an account? Sign in'}
+                    ? "Don't have an account? Create one"
+                    : 'Already have an account? Continue here'}
                 </button>
               </>
             )}

@@ -2,9 +2,17 @@ from sentence_transformers import cross_encoder
 
 model=cross_encoder.CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
-def rerank(question, chunks, top_k=4):
+def rerank(question, chunks, profile=None, top_k=4):
     if not chunks:
         return []
+
+    length_category = None
+    if profile:
+        length_category = profile.get("length_category") or profile.get("length")
+
+    if length_category == "short":
+        top_k = 6
+
     pairs=[(question, chunk["text"]) for chunk in chunks]
         
     scores=model.predict(pairs)

@@ -26,6 +26,7 @@ def rrf_merge(vector_results , keyword_results, k=60):
 def retrieve(question: str, strategy_output: dict, document_id: str, retriever, chunks: list, top_k: int = 10):
     strategy = strategy_output["strategy"]
     target_sections = strategy_output["target_sections"]
+    top_k = strategy_output.get("top_k", top_k)
 
     if strategy == "hybrid":
         vec_results = vector_search(question, document_id=document_id, top_k=top_k)

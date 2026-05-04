@@ -22,7 +22,7 @@ def classify_question(question: str) -> dict:
     has_numbers  = any(re.search(r'\d', w) for w in words)
     has_symbols  = bool(re.search(r'[%/=@#<>]', question))
 
-    # non-first words that are all caps or mixed caps → acronyms or technical terms
+    # non-first words that are all caps or mixed caps -> acronyms or technical terms
     has_acronyms = any(
         w.isupper() or (w[0].isupper() and not w.istitle())
         for w in words[1:]
@@ -90,44 +90,80 @@ def match_sections(question: str, sections: list[dict], top_n: int = 3) -> list[
 
 
 def decide_strategy(profile: dict, question: str, sections: list[dict], force_strategy: str = None) -> dict:
+    top_k = 8 if profile.get("has_tables") else 10
 
     # --- override ---
     if force_strategy:
         logger.info(f"Strategy manually overridden to: {force_strategy}")
+        # Still compute target sections for hierarchical+hybrid so the retriever
+        # actually performs section-filtered search instead of falling back to hybrid.
+        target_sections = (
+            match_sections(question, sections)
+            if force_strategy == "hierarchical+hybrid"
+            else []
+        )
         return {
             "strategy":        force_strategy,
             "reason":          f"Manually overridden by user to {force_strategy}",
-            "target_sections": [],
-            "confidence":      "forced"
+            "target_sections": target_sections,
+            "confidence":      "forced",
+            "top_k":           top_k,
         }
 
     structure_score = profile.get("structure_score", "low")
     length          = profile.get("length", "short")
+    has_tables      = profile.get("has_tables", False)
     q_analysis      = classify_question(question)
     question_type   = q_analysis["type"]
 
-    
     if length == "short":
-        reason = "Document is short — full hybrid search across entire document"
+        reason = "Document is short - full hybrid search across entire document"
         logger.info(reason)
         return {
             "strategy":        "hybrid",
             "reason":          reason,
             "target_sections": [],
-            "confidence":      "high"
+            "confidence":      "high",
+            "top_k":           top_k
         }
 
-    
-    if structure_score in ("low", "medium"):
-        reason = f"Structure score is {structure_score} — section boundaries unreliable, using hybrid"
+    if has_tables and structure_score in ("low", "medium"):
+        reason = f"Document contains tables and structure is {structure_score} - forcing hybrid retrieval"
         logger.info(reason)
         return {
             "strategy":        "hybrid",
             "reason":          reason,
             "target_sections": [],
-            "confidence":      "medium" if structure_score == "medium" else "low"
+            "confidence":      "medium" if structure_score == "medium" else "low",
+            "top_k":           top_k
         }
-    
+
+    if structure_score in ("low", "medium"):
+        reason = f"Structure score is {structure_score} - section boundaries unreliable, using hybrid"
+        logger.info(reason)
+        return {
+            "strategy":        "hybrid",
+            "reason":          reason,
+            "target_sections": [],
+            "confidence":      "medium" if structure_score == "medium" else "low",
+            "top_k":           top_k
+        }
+
+    if has_tables and structure_score == "high" and question_type == "term":
+        reason = (
+            f"High structure document contains tables and question is term-based "
+            f"(has_numbers: {q_analysis['has_numbers']}, has_acronyms: {q_analysis['has_acronyms']}) "
+            f"- forcing hybrid retrieval"
+        )
+        logger.info(reason)
+        return {
+            "strategy":        "hybrid",
+            "reason":          reason,
+            "target_sections": [],
+            "confidence":      "high",
+            "top_k":           top_k
+        }
+
     if structure_score == "high" and question_type == "concept":
         target_sections = match_sections(question, sections)
 
@@ -139,10 +175,10 @@ def decide_strategy(profile: dict, question: str, sections: list[dict], force_st
             )
             confidence = "high"
         else:
-            # high structure but no section matched — fall back to hybrid
+            # high structure but no section matched - fall back to hybrid
             reason = (
                 f"High structure document but no matching sections found "
-                f"for question — falling back to full hybrid"
+                f"for question - falling back to full hybrid"
             )
             confidence = "low"
             logger.warning(reason)
@@ -150,7 +186,8 @@ def decide_strategy(profile: dict, question: str, sections: list[dict], force_st
                 "strategy":        "hybrid",
                 "reason":          reason,
                 "target_sections": [],
-                "confidence":      confidence
+                "confidence":      confidence,
+                "top_k":           top_k
             }
 
         logger.info(reason)
@@ -158,30 +195,33 @@ def decide_strategy(profile: dict, question: str, sections: list[dict], force_st
             "strategy":        "hierarchical+hybrid",
             "reason":          reason,
             "target_sections": target_sections,
-            "confidence":      confidence
+            "confidence":      confidence,
+            "top_k":           top_k
         }
 
-    # --- high structure + term question → hybrid only ---
+    # --- high structure + term question -> hybrid only ---
     if structure_score == "high" and question_type == "term":
         reason = (
             f"High structure document but term-based question "
             f"(has_numbers: {q_analysis['has_numbers']}, has_acronyms: {q_analysis['has_acronyms']}) "
-            f"— using hybrid across full document"
+            f"- using hybrid across full document"
         )
         logger.info(reason)
         return {
             "strategy":        "hybrid",
             "reason":          reason,
             "target_sections": [],
-            "confidence":      "high"
+            "confidence":      "high",
+            "top_k":           top_k
         }
 
     # --- fallback ---
-    reason = "Could not confidently classify — defaulting to hybrid"
+    reason = "Could not confidently classify - defaulting to hybrid"
     logger.warning(reason)
     return {
         "strategy":        "hybrid",
         "reason":          reason,
         "target_sections": [],
-        "confidence":      "low"
+        "confidence":      "low",
+        "top_k":           top_k
     }

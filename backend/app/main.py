@@ -10,8 +10,9 @@ import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 import httpx
-from app.api.pipeline import ingest_document, answer_question
-from app.database import list_documents
+from loguru import logger
+from app.api.pipeline import ingest_document, answer_question, purge_document
+from app.database import list_documents, delete_document
 
 load_dotenv()
 
@@ -64,6 +65,8 @@ def _complete_with_fallback(models, api_key, messages):
                 model=model,
                 api_key=api_key,
                 messages=messages,
+                temperature=0,
+                max_tokens=1024,
             )
             return response, model
         except Exception as error:
@@ -181,7 +184,8 @@ async def upload_document(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {type(e).__name__}: {e}")
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -206,11 +210,20 @@ async def ask_question(
             request.force_strategy,
             user_id=user_id,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve answer: {type(e).__name__}: {e}")
 
     chunks_used = pipeline_output["chunks_used"]
-    max_context_chars = int(os.getenv("MAX_CONTEXT_CHARS", "8000"))
+
+    # Drop clearly irrelevant chunks (rerank_score < -3) unless they're all we have
+    relevant = [c for c in chunks_used if c.get("rerank_score", 0) >= -3]
+    if relevant:
+        chunks_used = relevant
+
+    max_context_chars = int(os.getenv("MAX_CONTEXT_CHARS", "12000"))
     context_parts = []
     total_chars = 0
     for chunk in chunks_used:
@@ -222,12 +235,24 @@ async def ask_question(
     context = "\n\n".join(context_parts)
 
     system_prompt = (
-        "You are a helpful assistant. Answer the question using the context below. "
-        "You may reason logically and draw inferences from the context — "
-        "if the answer can be deduced or inferred from what is stated, explain your reasoning clearly. "
-        "Only say 'I don't know' if the context provides no relevant information whatsoever. "
-        "Do not invent facts that are not supported by or inferable from the context."
+        "You are a precise document assistant. "
+        "Answer the question using ONLY the information explicitly stated in the context below. "
+        "Do not use knowledge from your training that is not present in the context — "
+        "if a fact, formula, number, or value is not written in the context, do not state it. "
+        "If the context fully answers the question, answer directly and concisely. "
+        "If the context only partially covers the question, answer what is covered and state "
+        "'The document does not provide further detail on this.' "
+        "If the context contains no relevant information at all, say "
+        "'The document does not contain this information.'"
     )
+
+    if pipeline_output.get("length_category") == "short":
+        system_prompt = (
+            "Answer based on the provided context. "
+            "If the answer is not explicitly stated but can be clearly inferred from the context, "
+            "reason carefully and answer. Only say 'I don't know' if the context contains no "
+            "relevant information at all."
+        )
 
     user_message = f"Context:\n{context}\n\nQuestion: {request.question}"
 
@@ -261,6 +286,18 @@ async def ask_question(
             for chunk in chunks_used
         ]
     }
+
+
+@app.delete("/documents/{document_id}")
+async def delete_document_endpoint(
+    document_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    purge_document(document_id)
+    deleted = delete_document(document_id, user_id=user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return {"message": "Document deleted."}
 
 
 @app.get("/documents")

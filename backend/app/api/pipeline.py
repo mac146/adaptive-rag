@@ -28,6 +28,15 @@ def _get_bm25(document_id: str, chunks: list[dict]) -> tuple[list, object]:
     return _bm25_cache[document_id]
 
 
+def purge_document(document_id: str) -> None:
+    """Remove a document's BM25 cache entry and Qdrant collection."""
+    _bm25_cache.pop(document_id, None)
+    try:
+        client.delete_collection(get_collection_name(document_id))
+    except Exception:
+        pass
+
+
 def ingest_document(file_path: str, filename: str, user_id: str = None) -> dict:
     elements = parse_document(file_path)
     if not elements:
@@ -113,7 +122,7 @@ def answer_question(
             "target_sections": strategy_output["target_sections"],
         }
 
-    reranked_chunks = rerank(question, retrieved_chunks)
+    reranked_chunks = rerank(question, retrieved_chunks, profile=profile)
 
     if not reranked_chunks:
         return {
@@ -132,4 +141,5 @@ def answer_question(
         "confidence":      strategy_output["confidence"],
         "reason":          strategy_output["reason"],
         "target_sections": strategy_output["target_sections"],
+        "length_category": profile.get("length_category") or profile.get("length"),
     }
